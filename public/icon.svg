@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="112" fill="#050B18"/>
+  <circle cx="256" cy="256" r="184" stroke="url(#halo)" stroke-width="14"/>
+  <circle cx="256" cy="256" r="144" stroke="#10F5A6" stroke-opacity="0.45" stroke-width="6"/>
+  <path d="M168 164H344V208H280V364H232V208H168V164Z" fill="url(#tgrad)"/>
+  <ellipse cx="256" cy="244" rx="108" ry="28" stroke="#10F5A6" stroke-width="14"/>
+  <defs>
+    <linearGradient id="halo" x1="72" y1="72" x2="440" y2="440" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#10F5A6"/>
+      <stop offset="1" stop-color="#0D8BFF"/>
+    </linearGradient>
+    <linearGradient id="tgrad" x1="168" y1="164" x2="344" y2="364" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#34F5C5"/>
+      <stop offset="1" stop-color="#059669"/>
+    </linearGradient>
+  </defs>
+</svg>

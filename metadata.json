@@ -1,0 +1,6 @@
+{
+  "name": "تيتر ليبيا | Tether Libya",
+  "description": "منصة تيتر ليبيا لشراء وبيع USDT بالدينار الليبي مباشرة عبر LYPay وOnePay وشبكة TRON بأمان وسرعة.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

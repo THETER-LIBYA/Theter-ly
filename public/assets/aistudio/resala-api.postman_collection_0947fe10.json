@@ -1,0 +1,185 @@
+{
+  "info": {
+    "name": "واجهة رسالة البرمجية",
+    "description": "واجهة رسالة البرمجية لإرسال الرسائل ورموز التحقق. ضع مفتاح الربط في المتغيّر token قبل الإرسال.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://dev.resala.ly/api/v1"
+    },
+    {
+      "key": "token",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "إرسال رمز تحقق (pins)",
+      "request": {
+        "method": "POST",
+        "description": "يولّد رمز تحقق ويرسله برسالة نصية ويعيده لك.",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/pins?service_name=MyApp",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "pins"
+          ],
+          "query": [
+            {
+              "key": "service_name",
+              "value": "MyApp"
+            },
+            {
+              "key": "test",
+              "value": "",
+              "disabled": true
+            },
+            {
+              "key": "len",
+              "value": "6",
+              "disabled": true
+            },
+            {
+              "key": "autofill",
+              "value": "FA+9qCX9VSuA",
+              "disabled": true
+            },
+            {
+              "key": "sender",
+              "value": "MyBrand",
+              "disabled": true
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"218910001234\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "إرسال رسالة عبر قالب (send-template)",
+      "request": {
+        "method": "POST",
+        "description": "يرسل قالباً معتمداً إلى مستلم أو أكثر مع تعويض المتغيّرات.",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/messages/send-template?sms_template_id=TEMPLATE_ID",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "messages",
+            "send-template"
+          ],
+          "query": [
+            {
+              "key": "sms_template_id",
+              "value": "TEMPLATE_ID"
+            },
+            {
+              "key": "test",
+              "value": "",
+              "disabled": true
+            },
+            {
+              "key": "sender",
+              "value": "MyBrand",
+              "disabled": true
+            },
+            {
+              "key": "scheduled_at",
+              "value": "2026-10-20 09:00",
+              "disabled": true
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"records\": [\n    { \"phone\": \"218910001234\", \"$1\": \"رسالة\", \"$2\": \"أحمد علي\" },\n    { \"phone\": \"218910001234\", \"$1\": \"رسالة\", \"$2\": \"سارة\", \"scheduled_at\": \"2026-10-20 09:00\" }\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "سجل الرسائل (sent-view)",
+      "request": {
+        "method": "GET",
+        "description": "كل ما أرسلته، رموزاً ورسائل، مع حالة كل واحدة.",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/sent-view?filters=source:message|pin",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "sent-view"
+          ],
+          "query": [
+            {
+              "key": "filters",
+              "value": "source:message|pin"
+            },
+            {
+              "key": "q",
+              "value": "910001234",
+              "disabled": true
+            },
+            {
+              "key": "sorts",
+              "value": "-created_at",
+              "disabled": true
+            },
+            {
+              "key": "page",
+              "value": "1",
+              "disabled": true
+            },
+            {
+              "key": "paginate",
+              "value": "20",
+              "disabled": true
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

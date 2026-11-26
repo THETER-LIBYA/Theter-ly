@@ -1,0 +1,116 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { isAdminAuthenticated } from '@/lib/auth';
+import { db } from '@/lib/db';
+import { dispatchNotification } from '@/lib/push';
+import { getClientIp, verifyOrigin } from '@/lib/security';
+
+export async function GET(req: NextRequest) {
+  const admin = await isAdminAuthenticated(req);
+  if (!admin.authorized) {
+    return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
+  }
+
+  const [templates, logs] = await Promise.all([
+    db.listNotificationTemplates(),
+    db.listAllNotifications(100),
+  ]);
+
+  return NextResponse.json({ templates, logs });
+}
+
+export async function POST(req: NextRequest) {
+  if (!verifyOrigin(req)) {
+    return NextResponse.json({ error: 'طلب غير مصرح به' }, { status: 403 });
+  }
+  const admin = await isAdminAuthenticated(req);
+  if (!admin.authorized) {
+    return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
+  }
+
+  const body = (await req.json()) as {
+    action: 'send' | 'update_template';
+    targetUserId?: string | 'all';
+    type?: 'order_updates' | 'rate_alerts' | 'promotions';
+    title?: string;
+    body?: string;
+    actionUrl?: string;
+    templateKey?: string;
+    templatePatch?: {
+      title_template?: string;
+      body_template?: string;
+      is_enabled?: boolean;
+      channel_push?: boolean;
+      channel_in_app?: boolean;
+    };
+  };
+
+  if (body.action === 'update_template' && body.templateKey && body.templatePatch) {
+    const updated = await db.updateNotificationTemplate(body.templateKey, body.templatePatch);
+    if (!updated) {
+      return NextResponse.json({ error: 'القالب غير موجود' }, { status: 404 });
+    }
+    await db.appendAuditLog({
+      actor_id: admin.actorId,
+      actor_role: admin.actorRole,
+      action: 'NOTIFICATION_TEMPLATE_UPDATED',
+      target_type: 'notification_template',
+      target_id: body.templateKey,
+      details_json: body.templatePatch,
+      ip_address: getClientIp(req),
+    });
+    return NextResponse.json({ ok: true, template: updated });
+  }
+
+  if (body.action === 'send') {
+    if (!body.title?.trim() || !body.body?.trim()) {
+      return NextResponse.json({ error: 'عنوان الإشعار ونصه مطلوبان' }, { status: 400 });
+    }
+
+    const notifType = body.type || 'promotions';
+    let sentCount = 0;
+    let pushCount = 0;
+
+    if (body.targetUserId === 'all' || !body.targetUserId) {
+      const users = await db.listUsers();
+      const results = await Promise.all(
+        users
+          .filter((u) => !u.is_banned)
+          .map((u) =>
+            dispatchNotification({
+              userId: u.id,
+              type: notifType,
+              fallbackTitle: body.title!.trim(),
+              fallbackBody: body.body!.trim(),
+              actionUrl: body.actionUrl?.trim() || '/notifications',
+            })
+          )
+      );
+      sentCount = results.filter((r) => r.inAppSent).length;
+      pushCount = results.reduce((sum, r) => sum + r.pushSentCount, 0);
+    } else {
+      const r = await dispatchNotification({
+        userId: body.targetUserId,
+        type: notifType,
+        fallbackTitle: body.title.trim(),
+        fallbackBody: body.body.trim(),
+        actionUrl: body.actionUrl?.trim() || '/notifications',
+      });
+      sentCount = r.inAppSent ? 1 : 0;
+      pushCount = r.pushSentCount;
+    }
+
+    await db.appendAuditLog({
+      actor_id: admin.actorId,
+      actor_role: admin.actorRole,
+      action: 'ADMIN_NOTIFICATION_SENT',
+      target_type: 'notification',
+      target_id: body.targetUserId || 'all',
+      details_json: { title: body.title, sentCount, pushCount },
+      ip_address: getClientIp(req),
+    });
+
+    return NextResponse.json({ ok: true, sentCount, pushCount });
+  }
+
+  return NextResponse.json({ error: 'إجراء غير صالح' }, { status: 400 });
+}
