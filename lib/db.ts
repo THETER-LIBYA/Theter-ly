@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import QRCode from 'qrcode';
+import { getWritableDataDir } from './storage';
 import { getSupabaseAdmin, isSupabaseConfigured } from './supabase';
 import {
   AdminAuditLog,
@@ -48,7 +49,7 @@ interface LocalStore {
   vapid_keys: { publicKey: string; privateKey: string } | null;
 }
 
-const DATA_DIR = path.resolve(process.cwd(), '.data');
+const DATA_DIR = getWritableDataDir();
 const DATA_FILE = path.join(DATA_DIR, 'tether-libya-db.json');
 
 const DEFAULT_PUBLIC_PAGES = {

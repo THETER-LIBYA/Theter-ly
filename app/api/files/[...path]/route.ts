@@ -3,6 +3,7 @@ import path from 'path';
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionUser, isAdminAuthenticated } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { getWritableDataDir } from '@/lib/storage';
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 
 const MIME_MAP: Record<string, string> = {
@@ -70,7 +71,7 @@ export async function GET(
     }
   }
 
-  const baseDir = path.resolve(process.cwd(), '.data', 'uploads', folder);
+  const baseDir = path.resolve(getWritableDataDir(), 'uploads', folder);
   const fileName = segments.slice(1).join('/');
   const resolved = path.resolve(baseDir, fileName);
 

@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { getSessionUser, isAdminAuthenticated } from '@/lib/auth';
 import { validateFileMagicBytes, verifyOrigin } from '@/lib/security';
+import { getWritableDataDir } from '@/lib/storage';
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5MB
@@ -15,6 +16,46 @@ const ALLOWED_MIME = new Set([
   'image/webp',
   'application/pdf',
 ]);
+
+async function persistUploadAsset(
+  folder: string,
+  relativePath: string,
+  buffer: Buffer,
+  contentType: string
+): Promise<string> {
+  if (isSupabaseConfigured()) {
+    const sb = getSupabaseAdmin()!;
+    const firstTry = await sb.storage.from(folder).upload(relativePath, buffer, {
+      contentType,
+      upsert: true,
+    });
+    if (!firstTry.error) {
+      return `/api/files/${folder}/${relativePath}`;
+    }
+
+    // Ensure bucket exists on fresh Supabase projects, then retry once
+    await sb.storage
+      .createBucket(folder, { public: folder === 'branding' })
+      .catch(() => null);
+
+    const retry = await sb.storage.from(folder).upload(relativePath, buffer, {
+      contentType,
+      upsert: true,
+    });
+    if (!retry.error) {
+      return `/api/files/${folder}/${relativePath}`;
+    }
+  }
+
+  const baseDir = path.resolve(getWritableDataDir(), 'uploads', folder);
+  const targetPath = path.resolve(baseDir, relativePath);
+  if (!targetPath.startsWith(baseDir + path.sep)) {
+    throw new Error('مسار غير صالح');
+  }
+  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+  fs.writeFileSync(targetPath, buffer);
+  return `/api/files/${folder}/${relativePath}`;
+}
 
 export async function POST(req: NextRequest) {
   if (!verifyOrigin(req)) {
@@ -74,68 +115,50 @@ export async function POST(req: NextRequest) {
     }
 
     const ext = file.type === 'application/pdf' ? 'pdf' : file.type.split('/')[1].replace('jpeg', 'jpg');
-    const fileName = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
+    const stamp = Date.now();
+    const fileName = `${stamp}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
     const ownerDir = user?.id || 'admin';
     const relativePath = `${ownerDir}/${fileName}`;
 
     let generatedIcons: Record<string, string> | undefined;
     if (folder === 'branding' && formData.get('generatePwaIcons') === '1' && file.type !== 'application/pdf') {
-      const publicDir = path.resolve(process.cwd(), 'public');
-      const customLogoPath = path.join(publicDir, 'images', 'brand-icon-custom.png');
-      fs.mkdirSync(path.dirname(customLogoPath), { recursive: true });
+      const [brandBuf, icon192Buf, icon512Buf, appleTouchBuf, inner384Buf] = await Promise.all([
+        sharp(buffer).resize(256, 256, { fit: 'cover' }).png().toBuffer(),
+        sharp(buffer).resize(192, 192, { fit: 'cover' }).png().toBuffer(),
+        sharp(buffer).resize(512, 512, { fit: 'cover' }).png().toBuffer(),
+        sharp(buffer).resize(180, 180, { fit: 'cover' }).png().toBuffer(),
+        sharp(buffer).resize(384, 384, { fit: 'cover' }).png().toBuffer(),
+      ]);
 
-      await sharp(buffer).resize(256, 256, { fit: 'cover' }).png().toFile(customLogoPath);
-      await sharp(buffer).resize(192, 192, { fit: 'cover' }).png().toFile(path.join(publicDir, 'pwa-192x192.png'));
-      await sharp(buffer).resize(512, 512, { fit: 'cover' }).png().toFile(path.join(publicDir, 'pwa-512x512.png'));
-      await sharp(buffer).resize(180, 180, { fit: 'cover' }).png().toFile(path.join(publicDir, 'apple-touch-icon.png'));
-
-      const inner = await sharp(buffer).resize(384, 384, { fit: 'cover' }).png().toBuffer();
-      await sharp({
+      const maskable512Buf = await sharp({
         create: { width: 512, height: 512, channels: 4, background: { r: 5, g: 11, b: 24, alpha: 1 } },
       })
-        .composite([{ input: inner, gravity: 'center' }])
+        .composite([{ input: inner384Buf, gravity: 'center' }])
         .png()
-        .toFile(path.join(publicDir, 'pwa-maskable-512x512.png'));
+        .toBuffer();
+
+      const [logoUrl, icon192Url, icon512Url, maskableUrl, appleUrl] = await Promise.all([
+        persistUploadAsset('branding', `pwa/${stamp}-brand-icon.png`, brandBuf, 'image/png'),
+        persistUploadAsset('branding', `pwa/${stamp}-pwa-192.png`, icon192Buf, 'image/png'),
+        persistUploadAsset('branding', `pwa/${stamp}-pwa-512.png`, icon512Buf, 'image/png'),
+        persistUploadAsset('branding', `pwa/${stamp}-pwa-maskable-512.png`, maskable512Buf, 'image/png'),
+        persistUploadAsset('branding', `pwa/${stamp}-apple-touch-icon.png`, appleTouchBuf, 'image/png'),
+      ]);
 
       generatedIcons = {
-        logo_url: '/images/brand-icon-custom.png?v=' + Date.now(),
-        icon_192_url: '/pwa-192x192.png?v=' + Date.now(),
-        icon_512_url: '/pwa-512x512.png?v=' + Date.now(),
-        icon_maskable_url: '/pwa-maskable-512x512.png?v=' + Date.now(),
-        apple_touch_icon_url: '/apple-touch-icon.png?v=' + Date.now(),
+        logo_url: logoUrl,
+        icon_192_url: icon192Url,
+        icon_512_url: icon512Url,
+        icon_maskable_url: maskableUrl,
+        apple_touch_icon_url: appleUrl,
       };
     }
 
-    if (isSupabaseConfigured()) {
-      const sb = getSupabaseAdmin()!;
-      const { error } = await sb.storage.from(folder).upload(relativePath, buffer, {
-        contentType: file.type,
-        upsert: false,
-      });
-      if (!error) {
-        if (folder === 'branding') {
-          const { data } = sb.storage.from(folder).getPublicUrl(relativePath);
-          return NextResponse.json({ ok: true, url: data.publicUrl, generatedIcons });
-        }
-        return NextResponse.json({
-          ok: true,
-          url: `/api/files/${folder}/${relativePath}`,
-          generatedIcons,
-        });
-      }
-    }
-
-    const baseDir = path.resolve(process.cwd(), '.data', 'uploads', folder);
-    const targetPath = path.resolve(baseDir, relativePath);
-    if (!targetPath.startsWith(baseDir + path.sep)) {
-      return NextResponse.json({ error: 'مسار غير صالح' }, { status: 400 });
-    }
-    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-    fs.writeFileSync(targetPath, buffer);
+    const url = await persistUploadAsset(folder, relativePath, buffer, file.type);
 
     return NextResponse.json({
       ok: true,
-      url: `/api/files/${folder}/${relativePath}`,
+      url,
       generatedIcons,
     });
   } catch (err) {
