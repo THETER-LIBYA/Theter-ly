@@ -62,15 +62,21 @@ export function AppShell({
   const [showIOSGuide, setShowIOSGuide] = useState(false);
   const [showSmartInstallBar, setShowSmartInstallBar] = useState(false);
   const [pwaDismissed, setPwaDismissed] = useState(false);
+  const [pushPromptDismissed, setPushPromptDismissed] = useState(false);
   const {
     isInstallable,
     isInstalled,
     isIOS,
     isOnline,
     updateAvailable,
+    pushSupported,
+    pushPermission,
+    isPushSubscribed,
+    syncingPush,
     installApp,
     applyUpdate,
-  } = usePWA();
+    subscribeToPush,
+  } = usePWA({ userId: user?.id });
 
   const appNameAr = siteContent?.app_name_ar || 'تيتر ليبيا';
   const appNameEn = siteContent?.app_name_en || 'Tether Libya';
@@ -257,6 +263,41 @@ export function AppShell({
           </p>
           <div className="h-[1px] flex-1 max-w-[72px] bg-gradient-to-l from-sky-400/70 to-transparent" />
         </div>
+
+        {/* One-tap External Push Opt-in Banner for Authenticated Users */}
+        {!isLockedGate && pushSupported && pushPermission === 'default' && !isPushSubscribed && !pushPromptDismissed && (
+          <div className="mb-4 rounded-2xl bg-[#0B1A33]/90 border border-sky-400/30 px-3.5 py-2.5 flex items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-sky-500/15 text-sky-300 flex items-center justify-center shrink-0">
+                <Bell className="w-4 h-4" />
+              </div>
+              <p className="text-xs text-slate-200 leading-snug">
+                فعّل الإشعارات الفورية لتصلك تحديثات الطلبات في أعلى الهاتف حتى عند إغلاق التطبيق.
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                disabled={syncingPush}
+                onClick={async () => {
+                  const res = await subscribeToPush();
+                  if (res.ok) setPushPromptDismissed(true);
+                }}
+                className="px-3 py-1.5 rounded-xl bg-[#10F5A6] text-slate-950 font-bold text-xs hover:bg-emerald-400 transition whitespace-nowrap disabled:opacity-60"
+              >
+                {syncingPush ? 'جاري...' : 'تفعيل'}
+              </button>
+              <button
+                type="button"
+                aria-label="إغلاق"
+                onClick={() => setPushPromptDismissed(true)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
         <main>{children}</main>
       </div>

@@ -1,4 +1,4 @@
-const SW_VERSION = 'tl-sw-v1.1.0';
+const SW_VERSION = 'tl-sw-v1.2.0';
 const STATIC_CACHE = `tether-libya-static-${SW_VERSION}`;
 const STATIC_ASSETS = [
   '/offline',
@@ -27,9 +27,8 @@ self.addEventListener('activate', (event) => {
           .filter((key) => key.startsWith('tether-libya-') && key !== STATIC_CACHE)
           .map((key) => caches.delete(key))
       )
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener('message', (event) => {
@@ -85,23 +84,25 @@ self.addEventListener('fetch', (event) => {
   }
 });
 
-// Web Push Notifications Handler
+// Web Push Notifications Handler (System-level heads-up / lock-screen alerts)
 self.addEventListener('push', (event) => {
-  if (!event.data) return;
   let data = {
     title: 'تيتر ليبيا | Tether Libya',
     body: 'لديك تحديث جديد في حسابك',
     url: '/notifications',
     icon: '/pwa-192x192.png',
     badge: '/pwa-192x192.png',
-    tag: 'tether-libya-notif',
+    tag: `tl-notif-${Date.now()}`,
   };
 
-  try {
-    const parsed = event.data.json();
-    data = { ...data, ...parsed };
-  } catch {
-    data.body = event.data.text();
+  if (event.data) {
+    try {
+      const parsed = event.data.json();
+      data = { ...data, ...parsed };
+    } catch {
+      const text = event.data.text();
+      if (text) data.body = text;
+    }
   }
 
   event.waitUntil(
@@ -109,7 +110,11 @@ self.addEventListener('push', (event) => {
       body: data.body,
       icon: data.icon || '/pwa-192x192.png',
       badge: data.badge || '/pwa-192x192.png',
-      tag: data.tag,
+      tag: data.tag || `tl-notif-${Date.now()}`,
+      renotify: true,
+      vibrate: [200, 100, 200],
+      timestamp: Date.now(),
+      silent: false,
       dir: 'rtl',
       lang: 'ar',
       data: { url: data.url || '/notifications' },
@@ -125,7 +130,9 @@ self.addEventListener('notificationclick', (event) => {
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
         if ('focus' in client) {
-          client.navigate(targetUrl);
+          if ('navigate' in client) {
+            client.navigate(targetUrl).catch(() => undefined);
+          }
           return client.focus();
         }
       }

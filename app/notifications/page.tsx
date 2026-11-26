@@ -23,6 +23,7 @@ export default async function NotificationsPage() {
   return (
     <AppShell siteContent={siteContent} user={user} unreadNotifications={unreadCount}>
       <NotificationsClient
+        userId={user.id}
         initialNotifications={notifications}
         initialPreferences={preferences}
       />

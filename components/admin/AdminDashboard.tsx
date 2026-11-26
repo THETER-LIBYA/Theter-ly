@@ -18,6 +18,7 @@ import {
   Users,
 } from 'lucide-react';
 import { formatTripoliDateTime } from '@/lib/format';
+import { usePWA } from '@/hooks/usePWA';
 import type {
   AdminAuditLog,
   AppNotification,
@@ -97,6 +98,15 @@ export function AdminDashboard() {
   const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>([]);
   const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([]);
+  const [adminPushNote, setAdminPushNote] = useState('');
+
+  const {
+    pushSupported,
+    isPushSubscribed,
+    syncingPush,
+    subscribeToPush,
+    sendTestPush,
+  } = usePWA({ userId: authorized ? 'admin' : null });
 
   const loadAllAdminData = useCallback(async () => {
     setLoadingData(true);
@@ -231,7 +241,33 @@ export function AdminDashboard() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {pushSupported && (
+            <button
+              type="button"
+              disabled={syncingPush}
+              onClick={async () => {
+                setAdminPushNote('');
+                if (!isPushSubscribed) {
+                  const res = await subscribeToPush();
+                  setAdminPushNote(res.ok ? 'تم تفعيل تنبيهات الإدارة الخارجية' : res.error || 'تعذر التفعيل');
+                } else {
+                  const res = await sendTestPush();
+                  setAdminPushNote(
+                    res.ok ? `تم إرسال إشعار اختبار (${res.sentCount})` : res.lastError || res.error || 'تعذر الإرسال'
+                  );
+                }
+              }}
+              className={`px-3 py-1.5 rounded-xl border text-xs inline-flex items-center gap-1.5 transition ${
+                isPushSubscribed
+                  ? 'bg-emerald-500/15 border-[#10F5A6]/40 text-[#10F5A6]'
+                  : 'bg-sky-500/15 border-sky-400/40 text-sky-200'
+              }`}
+            >
+              <Bell className="w-3.5 h-3.5" />
+              <span>{isPushSubscribed ? 'اختبار تنبيهات الإدارة' : 'تفعيل تنبيهات الإدارة'}</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={loadAllAdminData}
@@ -248,6 +284,7 @@ export function AdminDashboard() {
             <span>خروج</span>
           </button>
         </div>
+        {adminPushNote && <p className="w-full text-[11px] text-[#10F5A6]">{adminPushNote}</p>}
       </header>
 
       {/* Navigation Tabs */}

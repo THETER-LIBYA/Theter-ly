@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -19,7 +19,26 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   return outputArray;
 }
 
-export function usePWA() {
+function sameApplicationServerKey(
+  existingKey: ArrayBuffer | null | undefined,
+  expectedKey: Uint8Array
+): boolean {
+  if (!existingKey) return true; // Browser omitted key metadata; assume valid until push error
+  const existingBytes = new Uint8Array(existingKey);
+  if (existingBytes.length !== expectedKey.length) return false;
+  for (let i = 0; i < existingBytes.length; i += 1) {
+    if (existingBytes[i] !== expectedKey[i]) return false;
+  }
+  return true;
+}
+
+export interface UsePWAOptions {
+  userId?: string | null;
+}
+
+export function usePWA(options?: UsePWAOptions) {
+  const userId = options?.userId ?? null;
+
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
@@ -29,6 +48,67 @@ export function usePWA() {
   const [pushSupported, setPushSupported] = useState(false);
   const [pushPermission, setPushPermission] = useState<NotificationPermission>('default');
   const [isPushSubscribed, setIsPushSubscribed] = useState(false);
+  const [syncingPush, setSyncingPush] = useState(false);
+
+  const syncedKeyRef = useRef<string>('');
+
+  const syncSubscriptionForActor = useCallback(
+    async (reg: ServiceWorkerRegistration, activeUserId: string | null) => {
+      if (!('pushManager' in reg)) return;
+
+      try {
+        const keyRes = await fetch('/api/push/vapid-key', { cache: 'no-store' });
+        if (!keyRes.ok) return;
+        const { publicKey } = (await keyRes.json()) as { publicKey: string };
+        const expectedBytes = urlBase64ToUint8Array(publicKey);
+
+        let sub = await reg.pushManager.getSubscription();
+        if (sub && !sameApplicationServerKey(sub.options?.applicationServerKey, expectedBytes)) {
+          await sub.unsubscribe().catch(() => false);
+          sub = null;
+        }
+
+        // If the user already granted OS/browser permission and is signed in,
+        // automatically register & bind their PushSubscription to the server DB.
+        if (!sub && activeUserId && Notification.permission === 'granted') {
+          sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: expectedBytes,
+          });
+        }
+
+        if (sub && activeUserId) {
+          const syncKey = `${activeUserId}:${sub.endpoint}`;
+          if (syncedKeyRef.current !== syncKey) {
+            const json = sub.toJSON();
+            if (json.endpoint && json.keys?.p256dh && json.keys?.auth) {
+              const saveRes = await fetch('/api/push/subscribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  endpoint: json.endpoint,
+                  keys: json.keys,
+                }),
+              });
+              if (saveRes.ok) {
+                syncedKeyRef.current = syncKey;
+                setIsPushSubscribed(true);
+              } else {
+                setIsPushSubscribed(false);
+              }
+            }
+          } else {
+            setIsPushSubscribed(true);
+          }
+        } else {
+          setIsPushSubscribed(Boolean(sub && !activeUserId));
+        }
+      } catch {
+        // Ignore transient sync errors in unsupported frames
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -68,8 +148,9 @@ export function usePWA() {
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
-        .register('/sw.js', { scope: '/' })
+        .register('/sw.js', { scope: '/', updateViaCache: 'none' })
         .then(async (reg) => {
+          reg.update().catch(() => undefined);
           setSwRegistration(reg);
           if (reg.waiting) {
             setUpdateAvailable(true);
@@ -83,10 +164,9 @@ export function usePWA() {
               }
             });
           });
-          if ('pushManager' in reg) {
-            const existingSub = await reg.pushManager.getSubscription();
-            setIsPushSubscribed(Boolean(existingSub));
-          }
+
+          const readyReg = await navigator.serviceWorker.ready;
+          await syncSubscriptionForActor(readyReg, userId);
         })
         .catch(() => {
           // Ignore SW registration error in restricted frames
@@ -99,7 +179,7 @@ export function usePWA() {
       window.removeEventListener('beforeinstallprompt', onBeforeInstall);
       window.removeEventListener('appinstalled', onInstalled);
     };
-  }, []);
+  }, [userId, syncSubscriptionForActor]);
 
   const installApp = useCallback(async () => {
     if (!deferredPrompt) return false;
@@ -122,43 +202,68 @@ export function usePWA() {
 
   const subscribeToPush = useCallback(async () => {
     if (!pushSupported) return { ok: false, error: 'المتصفح لا يدعم إشعارات الدفع الفوري' };
-    const permission = await Notification.requestPermission();
-    setPushPermission(permission);
-    if (permission !== 'granted') {
-      return { ok: false, error: 'تم رفض صلاحية الإشعارات من إعدادات المتصفح' };
+    setSyncingPush(true);
+    try {
+      const permission = await Notification.requestPermission();
+      setPushPermission(permission);
+      if (permission !== 'granted') {
+        return { ok: false, error: 'تم رفض صلاحية الإشعارات من إعدادات المتصفح' };
+      }
+
+      const reg = await navigator.serviceWorker.ready;
+      const keyRes = await fetch('/api/push/vapid-key', { cache: 'no-store' });
+      if (!keyRes.ok) {
+        return { ok: false, error: 'تعذر جلب مفتاح الإشعارات من الخادم' };
+      }
+      const { publicKey } = (await keyRes.json()) as { publicKey: string };
+      const expectedBytes = urlBase64ToUint8Array(publicKey);
+
+      const existing = await reg.pushManager.getSubscription();
+      if (existing && !sameApplicationServerKey(existing.options?.applicationServerKey, expectedBytes)) {
+        await existing.unsubscribe().catch(() => false);
+      }
+
+      const subscription =
+        (await reg.pushManager.getSubscription()) ||
+        (await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: expectedBytes,
+        }));
+
+      const json = subscription.toJSON();
+      const saveRes = await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          endpoint: json.endpoint,
+          keys: json.keys,
+        }),
+      });
+
+      if (!saveRes.ok) {
+        const errData = (await saveRes.json().catch(() => ({}))) as { error?: string };
+        return { ok: false, error: errData.error || 'تعذر حفظ اشتراك الإشعارات' };
+      }
+
+      if (userId && json.endpoint) {
+        syncedKeyRef.current = `${userId}:${json.endpoint}`;
+      }
+      setIsPushSubscribed(true);
+      return { ok: true };
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : 'تعذر تفعيل الإشعارات الفورية على هذا المتصفح',
+      };
+    } finally {
+      setSyncingPush(false);
     }
-
-    const reg = swRegistration || (await navigator.serviceWorker.ready);
-    const keyRes = await fetch('/api/push/vapid-key');
-    const { publicKey } = (await keyRes.json()) as { publicKey: string };
-
-    const subscription = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(publicKey),
-    });
-
-    const json = subscription.toJSON();
-    const saveRes = await fetch('/api/push/subscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        endpoint: json.endpoint,
-        keys: json.keys,
-      }),
-    });
-
-    if (!saveRes.ok) {
-      const errData = (await saveRes.json().catch(() => ({}))) as { error?: string };
-      return { ok: false, error: errData.error || 'تعذر حفظ اشتراك الإشعارات' };
-    }
-
-    setIsPushSubscribed(true);
-    return { ok: true };
-  }, [pushSupported, swRegistration]);
+  }, [pushSupported, userId]);
 
   const unsubscribeFromPush = useCallback(async () => {
-    if (!swRegistration) return;
-    const sub = await swRegistration.pushManager.getSubscription();
+    const reg = swRegistration || (await navigator.serviceWorker.ready.catch(() => null));
+    if (!reg) return;
+    const sub = await reg.pushManager.getSubscription();
     if (sub) {
       const endpoint = sub.endpoint;
       await sub.unsubscribe();
@@ -168,8 +273,33 @@ export function usePWA() {
         body: JSON.stringify({ endpoint }),
       });
     }
+    syncedKeyRef.current = '';
     setIsPushSubscribed(false);
   }, [swRegistration]);
+
+  const sendTestPush = useCallback(async () => {
+    const ensure = await subscribeToPush();
+    if (!ensure.ok) {
+      return { ok: false, sentCount: 0, error: ensure.error };
+    }
+    const res = await fetch('/api/push/test', { method: 'POST' });
+    const data = (await res.json()) as {
+      ok?: boolean;
+      sentCount?: number;
+      failedCount?: number;
+      lastError?: string | null;
+      error?: string;
+    };
+    if (!res.ok) {
+      return { ok: false, sentCount: 0, error: data.error || 'فشل إرسال الإشعار التجريبي' };
+    }
+    return {
+      ok: Boolean(data.ok),
+      sentCount: data.sentCount || 0,
+      failedCount: data.failedCount || 0,
+      lastError: data.lastError || null,
+    };
+  }, [subscribeToPush]);
 
   return {
     isInstallable: Boolean(deferredPrompt),
@@ -180,9 +310,11 @@ export function usePWA() {
     pushSupported,
     pushPermission,
     isPushSubscribed,
+    syncingPush,
     installApp,
     applyUpdate,
     subscribeToPush,
     unsubscribeFromPush,
+    sendTestPush,
   };
 }
