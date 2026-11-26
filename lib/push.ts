@@ -4,26 +4,68 @@ import { db } from './db';
 let cachedVapid: { publicKey: string; privateKey: string } | null = null;
 let pendingVapidPromise: Promise<{ publicKey: string; privateKey: string }> | null = null;
 
+function normalizeVapidComponent(raw: string | undefined | null): string {
+  if (!raw) return '';
+  return raw
+    .trim()
+    .replace(/^['"]|['"]$/g, '')
+    .replace(/\s+/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+function decodeBase64Url(value: string): Buffer {
+  const pad = '='.repeat((4 - (value.length % 4)) % 4);
+  const b64 = (value + pad).replace(/-/g, '+').replace(/_/g, '/');
+  return Buffer.from(b64, 'base64');
+}
+
+function validateVapidKeyPair(
+  rawPub: string | undefined | null,
+  rawPriv: string | undefined | null
+): { publicKey: string; privateKey: string } | null {
+  const publicKey = normalizeVapidComponent(rawPub);
+  const privateKey = normalizeVapidComponent(rawPriv);
+  if (!publicKey || !privateKey) return null;
+
+  try {
+    const pubBuf = decodeBase64Url(publicKey);
+    const privBuf = decodeBase64Url(privateKey);
+    if (pubBuf.length !== 65 || pubBuf[0] !== 0x04 || privBuf.length !== 32) {
+      return null;
+    }
+    webpush.setVapidDetails('mailto:support@tetherlibya.ly', publicKey, privateKey);
+    return { publicKey, privateKey };
+  } catch {
+    return null;
+  }
+}
+
 export async function getVapidKeys(): Promise<{ publicKey: string; privateKey: string }> {
-  const envPub = process.env.VAPID_PUBLIC_KEY?.trim();
-  const envPriv = process.env.VAPID_PRIVATE_KEY?.trim();
-  if (envPub && envPriv) {
-    return { publicKey: envPub, privateKey: envPriv };
+  const envPair = validateVapidKeyPair(
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+  if (envPair) {
+    return envPair;
   }
   if (cachedVapid) return cachedVapid;
 
   if (!pendingVapidPromise) {
     pendingVapidPromise = (async () => {
       const stored = await db.getVapidKeysFromStore();
-      if (stored?.publicKey && stored?.privateKey) {
-        cachedVapid = stored;
-        return stored;
+      const validStored = validateVapidKeyPair(stored?.publicKey, stored?.privateKey);
+      if (validStored) {
+        cachedVapid = validStored;
+        return validStored;
       }
 
       const generated = webpush.generateVAPIDKeys();
-      await db.saveVapidKeysToStore(generated);
-      cachedVapid = generated;
-      return generated;
+      const validGenerated = validateVapidKeyPair(generated.publicKey, generated.privateKey) || generated;
+      await db.saveVapidKeysToStore(validGenerated);
+      cachedVapid = validGenerated;
+      return validGenerated;
     })().finally(() => {
       pendingVapidPromise = null;
     });
@@ -33,7 +75,9 @@ export async function getVapidKeys(): Promise<{ publicKey: string; privateKey: s
 }
 
 export function isVapidEnvConfigured(): boolean {
-  return Boolean(process.env.VAPID_PUBLIC_KEY?.trim() && process.env.VAPID_PRIVATE_KEY?.trim());
+  return Boolean(
+    validateVapidKeyPair(process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY)
+  );
 }
 
 function interpolate(template: string, vars: Record<string, string | number>): string {

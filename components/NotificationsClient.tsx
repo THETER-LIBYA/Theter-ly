@@ -19,6 +19,7 @@ export function NotificationsClient({
   const [notifications, setNotifications] = useState(initialNotifications);
   const [prefs, setPrefs] = useState(initialPreferences);
   const [pushFeedback, setPushFeedback] = useState('');
+  const [pushError, setPushError] = useState('');
   const [testingPush, setTestingPush] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const {
@@ -66,6 +67,7 @@ export function NotificationsClient({
 
   const handleToggleWebPush = async () => {
     setPushFeedback('');
+    setPushError('');
     if (isPushSubscribed) {
       await unsubscribeFromPush();
       setPrefs((p) => ({ ...p, web_push_enabled: false }));
@@ -76,7 +78,7 @@ export function NotificationsClient({
         setPrefs((p) => ({ ...p, web_push_enabled: true }));
         setPushFeedback('تم تفعيل الإشعارات الخارجية بنجاح! ستصلك التنبيهات في أعلى الهاتف حتى عند إغلاق التطبيق.');
       } else {
-        setPushFeedback(res.error || 'تعذر تفعيل الإشعارات');
+        setPushError(res.error || 'تعذر تفعيل الإشعارات');
       }
     }
   };
@@ -85,6 +87,7 @@ export function NotificationsClient({
     if (testingPush) return;
     setTestingPush(true);
     setPushFeedback('');
+    setPushError('');
 
     try {
       if (delaySeconds > 0) {
@@ -100,7 +103,7 @@ export function NotificationsClient({
         setPrefs((p) => ({ ...p, web_push_enabled: true }));
         setPushFeedback(`تم إرسال إشعار خارجي مباشر إلى ${res.sentCount} جهاز بنجاح.`);
       } else {
-        setPushFeedback(
+        setPushError(
           res.lastError ||
             res.error ||
             'تعذر إرسال الإشعار الخارجي — تأكد من السماح بالإشعارات في إعدادات المتصفح والهاتف.'
@@ -188,6 +191,7 @@ export function NotificationsClient({
         )}
 
         {pushFeedback && <p className="text-xs text-[#10F5A6] leading-relaxed">{pushFeedback}</p>}
+        {pushError && <p className="text-xs text-rose-300 leading-relaxed">{pushError}</p>}
       </div>
 
       {/* Granular Notification Preferences */}

@@ -8,8 +8,15 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const cleaned = (base64String || '')
+    .trim()
+    .replace(/^['"]|['"]$/g, '')
+    .replace(/\s+/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+  const padding = '='.repeat((4 - (cleaned.length % 4)) % 4);
+  const base64 = (cleaned + padding).replace(/-/g, '+').replace(/_/g, '/');
   const rawData = window.atob(base64);
   const buffer = new ArrayBuffer(rawData.length);
   const outputArray = new Uint8Array(buffer);
@@ -61,6 +68,9 @@ export function usePWA(options?: UsePWAOptions) {
         if (!keyRes.ok) return;
         const { publicKey } = (await keyRes.json()) as { publicKey: string };
         const expectedBytes = urlBase64ToUint8Array(publicKey);
+        if (expectedBytes.length !== 65 || expectedBytes[0] !== 0x04) {
+          return;
+        }
 
         let sub = await reg.pushManager.getSubscription();
         if (sub && !sameApplicationServerKey(sub.options?.applicationServerKey, expectedBytes)) {
@@ -73,7 +83,7 @@ export function usePWA(options?: UsePWAOptions) {
         if (!sub && activeUserId && Notification.permission === 'granted') {
           sub = await reg.pushManager.subscribe({
             userVisibleOnly: true,
-            applicationServerKey: expectedBytes,
+            applicationServerKey: expectedBytes.buffer,
           });
         }
 
@@ -217,6 +227,9 @@ export function usePWA(options?: UsePWAOptions) {
       }
       const { publicKey } = (await keyRes.json()) as { publicKey: string };
       const expectedBytes = urlBase64ToUint8Array(publicKey);
+      if (expectedBytes.length !== 65 || expectedBytes[0] !== 0x04) {
+        return { ok: false, error: 'مفتاح الإشعارات المستلم من الخادم غير صالح' };
+      }
 
       const existing = await reg.pushManager.getSubscription();
       if (existing && !sameApplicationServerKey(existing.options?.applicationServerKey, expectedBytes)) {
@@ -227,7 +240,7 @@ export function usePWA(options?: UsePWAOptions) {
         (await reg.pushManager.getSubscription()) ||
         (await reg.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: expectedBytes,
+          applicationServerKey: expectedBytes.buffer,
         }));
 
       const json = subscription.toJSON();
