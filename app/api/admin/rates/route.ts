@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isAdminAuthenticated } from '@/lib/auth';
+import { requireAdminPermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getOrRefreshRates } from '@/lib/prices';
 import { dispatchNotification } from '@/lib/push';
 import { getClientIp, verifyOrigin } from '@/lib/security';
 
 export async function GET(req: NextRequest) {
-  const admin = await isAdminAuthenticated(req);
-  if (!admin.authorized) {
-    return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
-  }
+  const check = await requireAdminPermission(req, 'rates');
+  if (!check.ok) return check.response;
   const rates = await db.getExchangeRates();
   return NextResponse.json({ rates });
 }
@@ -18,10 +16,9 @@ export async function PATCH(req: NextRequest) {
   if (!verifyOrigin(req)) {
     return NextResponse.json({ error: 'طلب غير مصرح به' }, { status: 403 });
   }
-  const admin = await isAdminAuthenticated(req);
-  if (!admin.authorized) {
-    return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
-  }
+  const check = await requireAdminPermission(req, 'rates');
+  if (!check.ok) return check.response;
+  const { admin } = check;
 
   const body = (await req.json()) as {
     syncNow?: boolean;

@@ -1,31 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isAdminAuthenticated } from '@/lib/auth';
+import { requireAdminPermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { dispatchNotification } from '@/lib/push';
 import { getClientIp, verifyOrigin } from '@/lib/security';
 
 export async function GET(req: NextRequest) {
-  const admin = await isAdminAuthenticated(req);
-  if (!admin.authorized) {
-    return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
-  }
+  const check = await requireAdminPermission(req, 'notifications');
+  if (!check.ok) return check.response;
 
-  const [templates, logs] = await Promise.all([
+  const [templates, logs, users] = await Promise.all([
     db.listNotificationTemplates(),
     db.listAllNotifications(100),
+    db.listUsers(),
   ]);
 
-  return NextResponse.json({ templates, logs });
+  const recipients = users
+    .filter((u) => !u.is_banned)
+    .map((u) => ({ id: u.id, full_name: u.full_name, phone: u.phone }));
+
+  return NextResponse.json({ templates, logs, recipients });
 }
 
 export async function POST(req: NextRequest) {
   if (!verifyOrigin(req)) {
     return NextResponse.json({ error: 'طلب غير مصرح به' }, { status: 403 });
   }
-  const admin = await isAdminAuthenticated(req);
-  if (!admin.authorized) {
-    return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
-  }
+  const check = await requireAdminPermission(req, 'notifications');
+  if (!check.ok) return check.response;
+  const { admin } = check;
 
   const body = (await req.json()) as {
     action: 'send' | 'update_template';

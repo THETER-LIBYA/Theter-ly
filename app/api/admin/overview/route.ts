@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isAdminAuthenticated } from '@/lib/auth';
+import { requireAdminPermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { isVapidEnvConfigured } from '@/lib/push';
 import { isResalaConfigured } from '@/lib/resala';
 import { isSupabaseConfigured } from '@/lib/supabase';
 
 export async function GET(req: NextRequest) {
-  const admin = await isAdminAuthenticated(req);
-  if (!admin.authorized) {
-    return NextResponse.json({ error: 'غير مصرح بالوصول الإداري' }, { status: 403 });
-  }
+  const check = await requireAdminPermission(req, 'overview');
+  if (!check.ok) return check.response;
 
   const [users, orders, ledger, rates, auditLogs] = await Promise.all([
     db.listUsers(),

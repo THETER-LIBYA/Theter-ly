@@ -31,11 +31,17 @@ export async function GET(
   if (folder !== 'branding') {
     const user = await getSessionUser(req);
     const admin = await isAdminAuthenticated(req);
-    if (!user && !admin.authorized) {
-      return NextResponse.json({ error: 'غير مصرح بالوصول للمستند' }, { status: 401 });
+    const adminCanViewFolder =
+      admin.authorized &&
+      ((folder === 'kyc' && admin.permissions.includes('users')) ||
+        ((folder === 'receipts' || folder === 'proofs') &&
+          (admin.permissions.includes('orders') || admin.permissions.includes('audit'))));
+
+    if (!user && !adminCanViewFolder) {
+      return NextResponse.json({ error: 'غير مصرح بالوصول للمستند' }, { status: admin.authenticated ? 403 : 401 });
     }
 
-    if (!admin.authorized && user) {
+    if (!adminCanViewFolder && user) {
       const requestedUrl = `/api/files/${segments.join('/')}`;
       const ownerPrefixMatch = segments.length >= 3 && segments[1] === user.id;
       const isUserKycDoc =

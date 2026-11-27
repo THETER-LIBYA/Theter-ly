@@ -35,7 +35,17 @@ export async function sendResalaPin(phone: string): Promise<ResalaPinResponse> {
   const isTestMode = process.env.RESALA_TEST_MODE === 'true';
 
   if (!token) {
-    // Server-side cryptographic OTP when RESALA_API_TOKEN is not yet configured in Secrets
+    if (process.env.NODE_ENV === 'production') {
+      return {
+        ok: false,
+        pin: '',
+        reference: null,
+        mode: 'resala_live',
+        errorType: 'NotConfigured',
+        error: 'بوابة الرسائل النصية غير مهيأة في متغيرات البيئة',
+      };
+    }
+    // Non-production local development fallback when RESALA_API_TOKEN is unset
     const pin = String(crypto.randomInt(100000, 999999));
     return {
       ok: true,

@@ -77,8 +77,11 @@ export async function POST(req: NextRequest) {
       ? folderRaw
       : 'receipts';
 
-    if ((folder === 'proofs' || folder === 'branding') && !admin.authorized) {
-      return NextResponse.json({ error: 'غير مصرح برفع ملفات في هذا المجلد' }, { status: 403 });
+    if (folder === 'proofs' && (!admin.authorized || !admin.permissions.includes('orders'))) {
+      return NextResponse.json({ error: 'غير مصرح برفع ملفات إثبات التحويل' }, { status: 403 });
+    }
+    if (folder === 'branding' && (!admin.authorized || !admin.permissions.includes('content'))) {
+      return NextResponse.json({ error: 'غير مصرح برفع ملفات الهوية البصرية' }, { status: 403 });
     }
 
     if (!(file instanceof File)) {

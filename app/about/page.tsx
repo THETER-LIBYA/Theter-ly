@@ -1,8 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Award, Building2, CheckCircle2, Clock, Globe, ShieldCheck, Users } from 'lucide-react';
+import { Award, Building2, Clock, Globe, Network, ShieldCheck, Wallet } from 'lucide-react';
 import { PublicInfoPage } from '@/components/PublicInfoPage';
-import { db } from '@/lib/db';
 import { buildPageMetadata } from '@/lib/seo';
 
 export const dynamic = 'force-dynamic';
@@ -12,29 +11,27 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function AboutPage() {
-  const stats = await db.getPublicStats();
-
   return (
     <PublicInfoPage
       slug="about"
       badgeLabel="هويتنا ورؤيتنا"
       extraContent={
         <div className="space-y-5">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-center">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
             <div className="rounded-2xl bg-[#071124] border border-white/10 p-4">
-              <Users className="w-5 h-5 text-sky-400 mx-auto" />
-              <div className="text-xl font-extrabold text-white tabular-nums mt-1.5">{stats.totalUsers}</div>
-              <div className="text-[11px] text-slate-400">عميل مسجل</div>
-            </div>
-            <div className="rounded-2xl bg-[#071124] border border-white/10 p-4">
-              <CheckCircle2 className="w-5 h-5 text-[#10F5A6] mx-auto" />
-              <div className="text-xl font-extrabold text-[#10F5A6] tabular-nums mt-1.5">{stats.completedOrders}</div>
-              <div className="text-[11px] text-slate-400">عملية منجزة</div>
-            </div>
-            <div className="rounded-2xl bg-[#071124] border border-white/10 p-4 col-span-2 sm:col-span-1">
               <Clock className="w-5 h-5 text-amber-300 mx-auto" />
-              <div className="text-xl font-extrabold text-white mt-1.5">5 – 30 د</div>
-              <div className="text-[11px] text-slate-400">متوسط زمن التنفيذ</div>
+              <div className="text-lg font-extrabold text-white mt-1.5">5 – 30 دقيقة</div>
+              <div className="text-[11px] text-slate-400">متوسط زمن المراجعة والتنفيذ</div>
+            </div>
+            <div className="rounded-2xl bg-[#071124] border border-white/10 p-4">
+              <Network className="w-5 h-5 text-[#10F5A6] mx-auto" />
+              <div className="text-lg font-extrabold text-[#10F5A6] mt-1.5 font-mono">TRON TRC20</div>
+              <div className="text-[11px] text-slate-400">الشبكة المعتمدة للتحويل المباشر</div>
+            </div>
+            <div className="rounded-2xl bg-[#071124] border border-white/10 p-4">
+              <Wallet className="w-5 h-5 text-sky-400 mx-auto" />
+              <div className="text-lg font-extrabold text-white mt-1.5">LYPay &amp; OnePay</div>
+              <div className="text-[11px] text-slate-400">وسائل الدفع المصرفية المحلية</div>
             </div>
           </div>
 
@@ -55,7 +52,7 @@ export default async function AboutPage() {
                 <span>تسعير شفاف ومحدث باستمرار</span>
               </div>
               <p className="text-slate-300 leading-relaxed">
-                تُحدَّث أسعار الشراء والبيع بصورة دورية وفق مؤشرات السوق الموازي الفعلية مع إظهار القيمة الصافية بالدينار الليبي قبل اعتماد أي طلب.
+                تُحدَّث أسعار الشراء والبيع بصورة دورية وفق مؤشرات السوق الفعلية مع إظهار القيمة الصافية بالدينار الليبي قبل اعتماد أي طلب.
               </p>
             </div>
 

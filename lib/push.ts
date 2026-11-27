@@ -247,46 +247,6 @@ export async function dispatchNotification(params: {
   };
 }
 
-export async function sendWebPushTest(userId: string) {
-  const siteContent = await db.getSiteContent().catch(() => null);
-  const appName = siteContent?.app_name_ar || 'تيتر ليبيا';
-  const title = `${appName} — إشعار تجريبي مباشر`;
-  const body = 'تصل الإشعارات الخارجية على جهازك بنجاح حتى عند إغلاق التطبيق.';
-
-  const delivery = await deliverPushToUser(userId, {
-    title,
-    body,
-    url: '/notifications',
-    tag: `tl-test-${Date.now()}`,
-  });
-
-  const pushStatus =
-    delivery.sentCount > 0
-      ? 'delivered'
-      : delivery.activeSubscriptions > 0
-        ? delivery.lastError
-          ? `failed:${delivery.lastError.slice(0, 60)}`
-          : 'failed'
-        : 'no_subscription';
-
-  const notification = await db
-    .createNotification({
-      user_id: userId,
-      order_id: null,
-      type: 'order_updates',
-      title,
-      body,
-      action_url: '/notifications',
-      push_status: pushStatus,
-    })
-    .catch(() => null);
-
-  return {
-    ...delivery,
-    notification,
-  };
-}
-
 export async function notifyAllAdmins(params: {
   templateKey?: string;
   fallbackTitle: string;
@@ -295,11 +255,11 @@ export async function notifyAllAdmins(params: {
   orderId?: string | null;
   actionUrl?: string | null;
 }) {
-  const admins = await db.listAdmins();
+  const adminIds = await db.listNotifiableAdminIds();
   await Promise.all(
-    admins.map((admin) =>
+    adminIds.map((adminId) =>
       dispatchNotification({
-        userId: admin.id,
+        userId: adminId,
         templateKey: params.templateKey,
         type: 'admin_alerts',
         fallbackTitle: params.fallbackTitle,
@@ -307,6 +267,7 @@ export async function notifyAllAdmins(params: {
         vars: params.vars,
         orderId: params.orderId,
         actionUrl: params.actionUrl || '/admin',
+        forceDeliver: true,
       })
     )
   );

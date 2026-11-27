@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isAdminAuthenticated } from '@/lib/auth';
+import { requireAdminPermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getClientIp, isValidTronAddress, sanitizeUrl, verifyOrigin } from '@/lib/security';
 
 export async function GET(req: NextRequest) {
-  const admin = await isAdminAuthenticated(req);
-  if (!admin.authorized) {
-    return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
-  }
+  const check = await requireAdminPermission(req, 'payments');
+  if (!check.ok) return check.response;
   const wallets = await db.listPlatformWallets(false);
   return NextResponse.json({ wallets });
 }
@@ -16,10 +14,9 @@ export async function POST(req: NextRequest) {
   if (!verifyOrigin(req)) {
     return NextResponse.json({ error: 'طلب غير مصرح به' }, { status: 403 });
   }
-  const admin = await isAdminAuthenticated(req);
-  if (!admin.authorized) {
-    return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
-  }
+  const check = await requireAdminPermission(req, 'payments');
+  if (!check.ok) return check.response;
+  const { admin } = check;
 
   const body = (await req.json()) as {
     id?: string;
@@ -61,10 +58,9 @@ export async function DELETE(req: NextRequest) {
   if (!verifyOrigin(req)) {
     return NextResponse.json({ error: 'طلب غير مصرح به' }, { status: 403 });
   }
-  const admin = await isAdminAuthenticated(req);
-  if (!admin.authorized) {
-    return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
-  }
+  const check = await requireAdminPermission(req, 'payments');
+  if (!check.ok) return check.response;
+  const { admin } = check;
 
   const id = req.nextUrl.searchParams.get('id');
   if (!id) {

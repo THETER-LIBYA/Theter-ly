@@ -53,6 +53,12 @@ export async function POST(req: NextRequest) {
 
     const resala = await sendResalaPin(normalized);
     if (!resala.ok || !resala.pin) {
+      if (resala.errorType === 'NotConfigured') {
+        return NextResponse.json(
+          { error: 'بوابة الرسائل النصية غير مهيأة في متغيرات البيئة' },
+          { status: 503 }
+        );
+      }
       if (resala.errorType === 'InputValidation' || resala.errorType === 'BadRequest') {
         return NextResponse.json(
           { error: 'رقم الهاتف المدخل غير صالح لإرسال رمز التحقق' },

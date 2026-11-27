@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isAdminAuthenticated } from '@/lib/auth';
+import { requireAdminPermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { dispatchNotification } from '@/lib/push';
 import { getClientIp, verifyOrigin } from '@/lib/security';
-import { KycStatus, UserRole } from '@/lib/types';
+import { KycStatus } from '@/lib/types';
 
 export async function GET(req: NextRequest) {
-  const admin = await isAdminAuthenticated(req);
-  if (!admin.authorized) {
-    return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
-  }
+  const check = await requireAdminPermission(req, 'users');
+  if (!check.ok) return check.response;
 
   const q = req.nextUrl.searchParams.get('q')?.trim() || undefined;
   const [users, orders] = await Promise.all([db.listUsers(q), db.listOrders({ limit: 500 })]);
@@ -30,10 +28,9 @@ export async function PATCH(req: NextRequest) {
   if (!verifyOrigin(req)) {
     return NextResponse.json({ error: 'طلب غير مصرح به' }, { status: 403 });
   }
-  const admin = await isAdminAuthenticated(req);
-  if (!admin.authorized) {
-    return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
-  }
+  const check = await requireAdminPermission(req, 'users');
+  if (!check.ok) return check.response;
+  const { admin } = check;
 
   const body = (await req.json()) as {
     userId: string;
@@ -41,9 +38,16 @@ export async function PATCH(req: NextRequest) {
     ban_reason?: string | null;
     kyc_status?: KycStatus;
     kyc_note?: string | null;
-    role?: UserRole;
+    role?: unknown;
     full_name?: string;
   };
+
+  if (body.role !== undefined) {
+    return NextResponse.json(
+      { error: 'تعديل صلاحيات المستخدمين غير مسموح — أدر طاقم العمل من قسم الأدوار فقط' },
+      { status: 403 }
+    );
+  }
 
   if (!body.userId) {
     return NextResponse.json({ error: 'معرف المستخدم مطلوب' }, { status: 400 });
@@ -68,9 +72,6 @@ export async function PATCH(req: NextRequest) {
     }
   } else if (body.kyc_note !== undefined) {
     patch.kyc_note = body.kyc_note?.trim() || null;
-  }
-  if (body.role && ['user', 'support', 'finance', 'admin', 'super_admin'].includes(body.role)) {
-    patch.role = body.role;
   }
   if (body.full_name?.trim()) {
     patch.full_name = body.full_name.trim();

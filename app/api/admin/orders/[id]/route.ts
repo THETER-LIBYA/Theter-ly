@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isAdminAuthenticated } from '@/lib/auth';
+import { requireAdminPermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { dispatchNotification } from '@/lib/push';
 import { getClientIp, sanitizeUrl, verifyOrigin } from '@/lib/security';
@@ -21,10 +21,9 @@ export async function PATCH(
     return NextResponse.json({ error: 'طلب غير مصرح به' }, { status: 403 });
   }
 
-  const admin = await isAdminAuthenticated(req);
-  if (!admin.authorized) {
-    return NextResponse.json({ error: 'غير مصرح بالوصول الإداري' }, { status: 403 });
-  }
+  const check = await requireAdminPermission(req, 'orders');
+  if (!check.ok) return check.response;
+  const { admin } = check;
 
   const { id } = await context.params;
   const order = await db.getOrderById(id);

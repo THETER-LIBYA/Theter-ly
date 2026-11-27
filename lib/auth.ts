@@ -1,14 +1,14 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { NextRequest } from 'next/server';
-import { db } from './db';
+import { NextRequest, NextResponse } from 'next/server';
+import { db, SUPER_ADMIN_ACTOR_ID } from './db';
 import {
   ADMIN_COOKIE_NAME,
   hashToken,
   SESSION_COOKIE_NAME,
   USER_SESSION_TTL_SECONDS,
 } from './security';
-import { User } from './types';
+import { AdminPermission, ALL_ADMIN_PERMISSIONS, STAFF_ASSIGNABLE_PERMISSIONS, User } from './types';
 
 export async function getSessionUser(req?: NextRequest): Promise<User | null> {
   let token: string | undefined;
@@ -56,11 +56,30 @@ export async function requireOnboardedUser(): Promise<User> {
   return user;
 }
 
-export async function isAdminAuthenticated(req?: NextRequest): Promise<{
+export interface AdminAuthContext {
   authorized: boolean;
+  authenticated: boolean;
   actorId: string | null;
+  actorType: 'super_admin' | 'staff' | null;
+  actorName: string;
   actorRole: string;
-}> {
+  permissions: AdminPermission[];
+}
+
+export async function isAdminAuthenticated(
+  req?: NextRequest,
+  requiredPermission?: AdminPermission
+): Promise<AdminAuthContext> {
+  const guest: AdminAuthContext = {
+    authorized: false,
+    authenticated: false,
+    actorId: null,
+    actorType: null,
+    actorName: '',
+    actorRole: 'guest',
+    permissions: [],
+  };
+
   let adminToken: string | undefined;
   if (req) {
     adminToken = req.headers.get('x-admin-token') || req.cookies.get(ADMIN_COOKIE_NAME)?.value;
@@ -69,19 +88,75 @@ export async function isAdminAuthenticated(req?: NextRequest): Promise<{
     adminToken = cookieStore.get(ADMIN_COOKIE_NAME)?.value;
   }
 
-  if (!adminToken) {
-    return { authorized: false, actorId: null, actorRole: 'guest' };
+  if (!adminToken) return guest;
+
+  const session = await db.getAdminSessionByTokenHash(hashToken(adminToken));
+  if (!session) return guest;
+
+  const expiresMs = new Date(session.expires_at).getTime();
+  if (!Number.isFinite(expiresMs) || expiresMs < Date.now()) {
+    return guest;
   }
 
-  const session = await db.getUserSessionByTokenHash(hashToken(adminToken));
-  if (!session || new Date(session.expires_at).getTime() < Date.now()) {
-    return { authorized: false, actorId: null, actorRole: 'guest' };
+  if (session.actor_type === 'super_admin') {
+    const permissions = ALL_ADMIN_PERMISSIONS;
+    const hasPerm = !requiredPermission || permissions.includes(requiredPermission);
+    return {
+      authorized: hasPerm,
+      authenticated: true,
+      actorId: SUPER_ADMIN_ACTOR_ID,
+      actorType: 'super_admin',
+      actorName: session.actor_name || 'المدير العام',
+      actorRole: 'super_admin',
+      permissions,
+    };
   }
 
-  const adminUser = await db.getUserById(session.user_id);
-  if (!adminUser || adminUser.is_banned || !['support', 'finance', 'admin', 'super_admin'].includes(adminUser.role)) {
-    return { authorized: false, actorId: null, actorRole: 'guest' };
+  if (session.actor_type === 'staff' && session.staff_id) {
+    const staff = await db.getAdminStaffById(session.staff_id);
+    if (!staff || !staff.is_active) {
+      return guest;
+    }
+    const permissions = (staff.permissions_json || []).filter((p): p is AdminPermission =>
+      STAFF_ASSIGNABLE_PERMISSIONS.includes(p)
+    );
+    const hasPerm = !requiredPermission || permissions.includes(requiredPermission);
+    return {
+      authorized: hasPerm,
+      authenticated: true,
+      actorId: staff.id,
+      actorType: 'staff',
+      actorName: staff.full_name,
+      actorRole: staff.role,
+      permissions,
+    };
   }
 
-  return { authorized: true, actorId: adminUser.id, actorRole: adminUser.role };
+  return guest;
+}
+
+export async function requireAdminPermission(
+  req: NextRequest,
+  requiredPermission?: AdminPermission
+): Promise<
+  | { ok: true; admin: AdminAuthContext }
+  | { ok: false; response: NextResponse }
+> {
+  const admin = await isAdminAuthenticated(req, requiredPermission);
+  if (!admin.authenticated) {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: 'يرجى تسجيل الدخول لبوابة الإدارة' }, { status: 401 }),
+    };
+  }
+  if (!admin.authorized) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: 'ليس لديك صلاحية تنفيذ هذا الإجراء الإداري' },
+        { status: 403 }
+      ),
+    };
+  }
+  return { ok: true, admin };
 }

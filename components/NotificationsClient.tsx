@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Bell, BellRing, CheckCheck, ChevronLeft, RefreshCw, Send, Settings2, Smartphone } from 'lucide-react';
+import { Bell, BellRing, CheckCheck, ChevronLeft, RefreshCw, Settings2, Smartphone } from 'lucide-react';
 import { usePWA } from '@/hooks/usePWA';
 import { formatTripoliDateTime } from '@/lib/format';
 import type { AppNotification, UserNotificationPreferences } from '@/lib/types';
@@ -20,21 +20,17 @@ export function NotificationsClient({
   const [prefs, setPrefs] = useState(initialPreferences);
   const [pushFeedback, setPushFeedback] = useState('');
   const [pushError, setPushError] = useState('');
-  const [testingPush, setTestingPush] = useState(false);
   const [refreshingList, setRefreshingList] = useState(false);
-  const [countdown, setCountdown] = useState<number | null>(null);
+
   const {
     pushSupported,
     pushPermission,
     isPushSubscribed,
-    swActive,
-    serverSubscribedCount,
     syncingPush,
     isIOS,
     isInstalled,
     subscribeToPush,
     unsubscribeFromPush,
-    sendTestPush,
   } = usePWA({ userId });
 
   const refreshFromServer = useCallback(async () => {
@@ -55,7 +51,12 @@ export function NotificationsClient({
 
   useEffect(() => {
     const onUpdated = (ev: Event) => {
-      const detail = (ev as CustomEvent<{ notifications?: AppNotification[]; preferences?: UserNotificationPreferences }>).detail;
+      const detail = (
+        ev as CustomEvent<{
+          notifications?: AppNotification[];
+          preferences?: UserNotificationPreferences;
+        }>
+      ).detail;
       if (detail?.notifications) setNotifications(detail.notifications);
       if (detail?.preferences) setPrefs(detail.preferences);
     };
@@ -107,54 +108,10 @@ export function NotificationsClient({
       const res = await subscribeToPush();
       if (res.ok) {
         setPrefs((p) => ({ ...p, web_push_enabled: true }));
-        setPushFeedback('تم تفعيل الإشعارات الخارجية بنجاح! ستصلك التنبيهات في أعلى الهاتف حتى عند إغلاق التطبيق.');
+        setPushFeedback('تم تفعيل الإشعارات الخارجية بنجاح؛ ستصلك تنبيهات الطلبات والأسعار في أعلى الهاتف.');
       } else {
-        setPushError(res.error || 'تعذر تفعيل الإشعارات');
+        setPushError(res.error || 'تعذر تفعيل الإشعارات على هذا الجهاز');
       }
-    }
-  };
-
-  const handleTestPush = async (delaySeconds = 0) => {
-    if (testingPush) return;
-    setTestingPush(true);
-    setPushFeedback('');
-    setPushError('');
-
-    try {
-      if (delaySeconds > 0) {
-        for (let s = delaySeconds; s > 0; s -= 1) {
-          setCountdown(s);
-          await new Promise((r) => setTimeout(r, 1000));
-        }
-        setCountdown(null);
-      }
-
-      const res = await sendTestPush();
-      await refreshFromServer();
-
-      if (res.ok && res.sentCount > 0) {
-        setPrefs((p) => ({ ...p, web_push_enabled: true }));
-        if (res.swReceivedPush) {
-          setPushFeedback('تم إرسال واستلام الإشعار الخارجي المباشر على جهازك بنجاح!');
-        } else if (res.localFallbackShown) {
-          setPushFeedback(
-            `أرسل الخادم الإشعار لبوابة الدفع (${res.sentCount} جهاز) وتم عرض إشعار التحقق المحلي؛ إن لم يصلك الإشعار السحابي أوقف VPN أو DNS الخاص مؤقتاً.`
-          );
-        } else {
-          setPushError(
-            'أرسل الخادم الإشعار لبوابة الدفع، لكن نظام الهاتف لم يُظهره — تحقق من تفعيل إشعارات المتصفح في إعدادات الهاتف وعدم تفعيل عدم الإزعاج.'
-          );
-        }
-      } else {
-        setPushError(
-          res.lastError ||
-            res.error ||
-            'تعذر إرسال الإشعار الخارجي — تأكد من السماح بالإشعارات في إعدادات المتصفح والهاتف.'
-        );
-      }
-    } finally {
-      setCountdown(null);
-      setTestingPush(false);
     }
   };
 
@@ -172,7 +129,7 @@ export function NotificationsClient({
               <p className="text-xs text-slate-400">
                 {pushSupported
                   ? isPushSubscribed
-                    ? 'مفعّلة ومرتبطة بهذا الجهاز — تصلك خارج التطبيق'
+                    ? 'مفعّلة ومرتبطة بهذا الجهاز — تصلك التنبيهات خارج التطبيق'
                     : pushPermission === 'denied'
                       ? 'محظورة من إعدادات المتصفح — فعّلها من إعدادات الموقع'
                       : 'غير مفعّلة على هذا الجهاز بعد'
@@ -197,76 +154,12 @@ export function NotificationsClient({
           )}
         </div>
 
-        {/* Real-time Push Diagnostics */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
-          <div className="rounded-xl bg-[#071124] border border-white/10 px-2.5 py-2">
-            <span className="text-slate-400 block">دعم المتصفح</span>
-            <span className={pushSupported ? 'text-[#10F5A6] font-bold' : 'text-rose-300 font-bold'}>
-              {pushSupported ? 'مدعوم' : 'غير مدعوم'}
-            </span>
-          </div>
-          <div className="rounded-xl bg-[#071124] border border-white/10 px-2.5 py-2">
-            <span className="text-slate-400 block">صلاحية الجهاز</span>
-            <span className={pushPermission === 'granted' ? 'text-[#10F5A6] font-bold' : 'text-amber-300 font-bold'}>
-              {pushPermission === 'granted' ? 'مسموح' : pushPermission === 'denied' ? 'محظور' : 'قيد الانتظار'}
-            </span>
-          </div>
-          <div className="rounded-xl bg-[#071124] border border-white/10 px-2.5 py-2">
-            <span className="text-slate-400 block">خدمة الخلفية</span>
-            <span className={swActive ? 'text-[#10F5A6] font-bold' : 'text-amber-300 font-bold'}>
-              {swActive ? 'نشطة' : 'قيد التهيئة'}
-            </span>
-          </div>
-          <div className="rounded-xl bg-[#071124] border border-white/10 px-2.5 py-2">
-            <span className="text-slate-400 block">ربط الخادم</span>
-            <span className={serverSubscribedCount > 0 ? 'text-[#10F5A6] font-bold' : 'text-slate-300 font-bold'}>
-              {serverSubscribedCount > 0 ? `متصل (${serverSubscribedCount})` : 'غير مربوط'}
-            </span>
-          </div>
-        </div>
-
         {isIOS && !isInstalled && (
           <div className="rounded-2xl bg-amber-500/10 border border-amber-400/30 p-3 flex items-start gap-2.5 text-xs text-amber-200">
             <Smartphone className="w-4 h-4 shrink-0 mt-0.5 text-amber-300" />
             <p className="leading-relaxed">
               على أجهزة iPhone و iPad، لوصول الإشعارات خارج المتصفح يرجى الضغط على زر <strong>مشاركة</strong> في Safari ثم اختيار <strong>إضافة إلى الشاشة الرئيسية</strong> وفتح التطبيق من الأيقونة الجديدة.
             </p>
-          </div>
-        )}
-
-        {pushSupported && (
-          <div className="flex flex-wrap gap-2 pt-1">
-            <button
-              type="button"
-              disabled={testingPush || syncingPush}
-              onClick={() => handleTestPush(0)}
-              className="px-3.5 py-2 rounded-xl bg-white/5 border border-white/15 hover:border-[#10F5A6]/45 text-xs font-semibold text-slate-100 inline-flex items-center gap-1.5 transition disabled:opacity-60"
-            >
-              <Send className="w-3.5 h-3.5 text-[#10F5A6]" />
-              <span>إرسال إشعار تجريبي فوري</span>
-            </button>
-            <button
-              type="button"
-              disabled={testingPush || syncingPush}
-              onClick={() => handleTestPush(3)}
-              className="px-3.5 py-2 rounded-xl bg-sky-500/15 border border-sky-400/30 hover:border-sky-400/60 text-xs font-semibold text-sky-200 inline-flex items-center gap-1.5 transition disabled:opacity-60"
-            >
-              <Bell className="w-3.5 h-3.5" />
-              <span>
-                {countdown !== null
-                  ? `سيصل خلال ${countdown} ثانية — اخرج من التطبيق الآن`
-                  : 'اختبار بعد 3 ثوانٍ (اخرج من التطبيق الآن)'}
-              </span>
-            </button>
-            <button
-              type="button"
-              disabled={refreshingList}
-              onClick={refreshFromServer}
-              className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-300 inline-flex items-center gap-1.5 hover:border-white/25 transition disabled:opacity-60"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${refreshingList ? 'animate-spin' : ''}`} />
-              <span>تحديث السجل</span>
-            </button>
           </div>
         )}
 
@@ -311,21 +204,33 @@ export function NotificationsClient({
 
       {/* Notification Feed */}
       <div className="tl-glass-card rounded-3xl p-5 space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-bold text-white flex items-center gap-2">
             <Bell className="w-4 h-4 text-[#10F5A6]" />
             <span>سجل الإشعارات</span>
           </h2>
-          {notifications.some((n) => !n.is_read) && (
+          <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={markAllRead}
-              className="inline-flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 font-semibold"
+              disabled={refreshingList}
+              onClick={refreshFromServer}
+              aria-label="تحديث سجل الإشعارات"
+              className="inline-flex items-center gap-1 text-xs text-slate-300 hover:text-white transition disabled:opacity-60"
             >
-              <CheckCheck className="w-4 h-4" />
-              <span>تحديد الكل كمقروء</span>
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshingList ? 'animate-spin' : ''}`} />
+              <span>تحديث</span>
             </button>
-          )}
+            {notifications.some((n) => !n.is_read) && (
+              <button
+                type="button"
+                onClick={markAllRead}
+                className="inline-flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 font-semibold"
+              >
+                <CheckCheck className="w-4 h-4" />
+                <span>تحديد الكل كمقروء</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {notifications.length === 0 ? (

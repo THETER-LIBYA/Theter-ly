@@ -278,3 +278,93 @@ export interface SupportMessage {
   created_at: string;
   updated_at: string;
 }
+
+export type StaffRole = 'support' | 'finance' | 'marketing' | 'manager';
+
+export type AdminPermission =
+  | 'overview'
+  | 'orders'
+  | 'rates'
+  | 'payments'
+  | 'users'
+  | 'support'
+  | 'notifications'
+  | 'content'
+  | 'seo'
+  | 'audit'
+  | 'staff';
+
+export const STAFF_ASSIGNABLE_PERMISSIONS: AdminPermission[] = [
+  'overview',
+  'orders',
+  'rates',
+  'payments',
+  'users',
+  'support',
+  'notifications',
+  'content',
+  'seo',
+  'audit',
+];
+
+export const ALL_ADMIN_PERMISSIONS: AdminPermission[] = [
+  ...STAFF_ASSIGNABLE_PERMISSIONS,
+  'staff',
+];
+
+export const STAFF_ROLE_LABELS: Record<StaffRole | 'super_admin', string> = {
+  super_admin: 'المدير العام',
+  support: 'دعم فني',
+  finance: 'مراجعة مالية',
+  marketing: 'معلن وإدارة محتوى',
+  manager: 'مشرف تشغيلي',
+};
+
+export const STAFF_ROLE_DEFAULT_PERMISSIONS: Record<StaffRole, AdminPermission[]> = {
+  support: ['overview', 'support', 'users'],
+  finance: ['overview', 'orders', 'rates', 'payments', 'audit'],
+  marketing: ['overview', 'notifications', 'content', 'seo'],
+  manager: ['overview', 'orders', 'rates', 'payments', 'users', 'support', 'notifications', 'content', 'seo', 'audit'],
+};
+
+export const ADMIN_PERMISSION_LABELS: Record<AdminPermission, string> = {
+  overview: 'الرئيسية والإحصائيات',
+  orders: 'الطلبات والمراجعة المالية',
+  rates: 'إدارة التسعير',
+  payments: 'وسائل الدفع والمحافظ',
+  users: 'المستخدمون وتوثيق الهوية',
+  support: 'رسائل الدعم الفني',
+  notifications: 'إرسال الإشعارات والقوالب',
+  content: 'المحتوى والهوية البصرية',
+  seo: 'إدارة SEO',
+  audit: 'السجل المالي والتدقيق',
+  staff: 'طاقم العمل والأدوار',
+};
+
+export interface AdminStaff {
+  id: string;
+  full_name: string;
+  username: string;
+  password_hash: string;
+  role: StaffRole;
+  permissions_json: AdminPermission[];
+  is_active: boolean;
+  last_login_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminSession {
+  id: string;
+  actor_type: 'super_admin' | 'staff';
+  staff_id: string | null;
+  actor_name: string;
+  actor_role: 'super_admin' | StaffRole;
+  token_hash: string;
+  user_agent: string | null;
+  ip_address: string | null;
+  expires_at: string;
+  revoked_at: string | null;
+  created_at: string;
+}
+

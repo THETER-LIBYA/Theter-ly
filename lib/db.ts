@@ -6,6 +6,9 @@ import { getWritableDataDir } from './storage';
 import { getSupabaseAdmin, isSupabaseConfigured } from './supabase';
 import {
   AdminAuditLog,
+  AdminPermission,
+  AdminSession,
+  AdminStaff,
   AppNotification,
   ExchangeRates,
   KycStatus,
@@ -20,6 +23,7 @@ import {
   PushSubscriptionRecord,
   SeoSetting,
   SiteContent,
+  StaffRole,
   SupportMessage,
   User,
   UserNotificationPreferences,
@@ -27,10 +31,14 @@ import {
   UserSession,
 } from './types';
 
+export const SUPER_ADMIN_ACTOR_ID = '00000000-0000-4000-8000-000000000001';
+
 interface LocalStore {
   users: User[];
   otp_sessions: OtpSession[];
   user_sessions: UserSession[];
+  admin_staff?: AdminStaff[];
+  admin_sessions?: AdminSession[];
   exchange_rates: ExchangeRates;
   payment_accounts: PaymentAccount[];
   platform_wallets: PlatformWallet[];
@@ -331,6 +339,8 @@ function createInitialStore(): LocalStore {
     users: [],
     otp_sessions: [],
     user_sessions: [],
+    admin_staff: [],
+    admin_sessions: [],
     exchange_rates: {
       id: 'default',
       source: 'prices_ly',
@@ -592,15 +602,15 @@ export const db = {
     return users;
   },
 
-  async listAdmins(): Promise<User[]> {
-    if (isSupabaseConfigured()) {
-      const { data } = await getSupabaseAdmin()!
-        .from('users')
-        .select('*')
-        .in('role', ['support', 'finance', 'admin', 'super_admin']);
-      return (data || []) as User[];
+  async listNotifiableAdminIds(): Promise<string[]> {
+    const ids = new Set<string>([SUPER_ADMIN_ACTOR_ID]);
+    const staffList = await this.listAdminStaff();
+    for (const s of staffList) {
+      if (s.is_active && (s.permissions_json.includes('orders') || s.permissions_json.includes('support'))) {
+        ids.add(s.id);
+      }
     }
-    return readLocalStore().users.filter((u) => ['support', 'finance', 'admin', 'super_admin'].includes(u.role));
+    return Array.from(ids);
   },
 
   async upsertUserByPhone(phone: string, defaults?: Partial<User>): Promise<User> {
@@ -623,7 +633,7 @@ export const db = {
       email: defaults?.email || null,
       avatar_url: defaults?.avatar_url || null,
       kyc_status: defaults?.kyc_status || 'unverified',
-      role: defaults?.role || 'user',
+      role: 'user',
       is_banned: false,
       ban_reason: null,
       total_volume_usdt: 0,
@@ -1592,11 +1602,41 @@ export const db = {
       .slice(0, limit);
   },
 
-  // --- Helpers for KPIs ---
-  async getPublicStats() {
-    const orders = await this.listOrders();
-    const users = await this.listUsers();
-    const rates = await this.getExchangeRates();
+  // --- Helpers for KPIs (Strictly separated: Customer Personal vs Admin Platform) ---
+  async getUserStats(userId: string) {
+    const [orders, rates] = await Promise.all([
+      this.listOrders({ userId, limit: 500 }),
+      this.getExchangeRates(),
+    ]);
+    const completed = orders.filter((o) => o.status === 'completed');
+    const pending = orders.filter((o) =>
+      ['pending_review', 'under_review', 'needs_edit', 'approved'].includes(o.status)
+    );
+    const completedBuys = completed.filter((o) => o.type === 'buy');
+    const completedSells = completed.filter((o) => o.type === 'sell');
+
+    return {
+      totalOrders: orders.length,
+      buyOrders: orders.filter((o) => o.type === 'buy').length,
+      sellOrders: orders.filter((o) => o.type === 'sell').length,
+      completedOrders: completed.length,
+      pendingOrders: pending.length,
+      rejectedOrders: orders.filter((o) => o.status === 'rejected').length,
+      totalBoughtUsdt: completedBuys.reduce((acc, o) => acc + Number(o.usdt_amount || 0), 0),
+      totalSoldUsdt: completedSells.reduce((acc, o) => acc + Number(o.usdt_amount || 0), 0),
+      totalLydVolume: completed.reduce((acc, o) => acc + Number(o.lyd_amount || 0), 0),
+      buyRate: rates.buy_rate,
+      sellRate: rates.sell_rate,
+      lastRateUpdate: rates.last_fetched_at,
+    };
+  },
+
+  async getPlatformStats() {
+    const [orders, users, rates] = await Promise.all([
+      this.listOrders(),
+      this.listUsers(),
+      this.getExchangeRates(),
+    ]);
     const completed = orders.filter((o) => o.status === 'completed');
     const totalUsdt = completed.reduce((acc, o) => acc + Number(o.usdt_amount || 0), 0);
     const totalLyd = completed.reduce((acc, o) => acc + Number(o.lyd_amount || 0), 0);
@@ -1688,6 +1728,199 @@ export const db = {
     };
     writeLocalStore(store);
     return store.support_messages[idx];
+  },
+
+  // --- Isolated Staff Accounts & Admin Sessions ---
+  async listAdminStaff(): Promise<AdminStaff[]> {
+    if (isSupabaseConfigured()) {
+      const { data } = await getSupabaseAdmin()!
+        .from('admin_staff')
+        .select('*')
+        .order('created_at', { ascending: false });
+      return (data || []) as AdminStaff[];
+    }
+    return [...(readLocalStore().admin_staff || [])].sort((a, b) =>
+      b.created_at.localeCompare(a.created_at)
+    );
+  },
+
+  async getAdminStaffById(id: string): Promise<AdminStaff | null> {
+    if (isSupabaseConfigured()) {
+      const { data } = await getSupabaseAdmin()!
+        .from('admin_staff')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      return data as AdminStaff | null;
+    }
+    return (readLocalStore().admin_staff || []).find((s) => s.id === id) || null;
+  },
+
+  async getAdminStaffByUsername(username: string): Promise<AdminStaff | null> {
+    const clean = username.trim().toLowerCase();
+    if (isSupabaseConfigured()) {
+      const { data } = await getSupabaseAdmin()!
+        .from('admin_staff')
+        .select('*')
+        .eq('username', clean)
+        .maybeSingle();
+      return data as AdminStaff | null;
+    }
+    return (readLocalStore().admin_staff || []).find((s) => s.username.toLowerCase() === clean) || null;
+  },
+
+  async createAdminStaff(input: {
+    full_name: string;
+    username: string;
+    password_hash: string;
+    role: StaffRole;
+    permissions_json: AdminPermission[];
+  }): Promise<AdminStaff> {
+    const now = new Date().toISOString();
+    const record: AdminStaff = {
+      id: crypto.randomUUID(),
+      full_name: input.full_name.trim(),
+      username: input.username.trim().toLowerCase(),
+      password_hash: input.password_hash,
+      role: input.role,
+      permissions_json: input.permissions_json.filter((p) => p !== 'staff'),
+      is_active: true,
+      last_login_at: null,
+      created_at: now,
+      updated_at: now,
+    };
+    if (isSupabaseConfigured()) {
+      const { data, error } = await getSupabaseAdmin()!
+        .from('admin_staff')
+        .insert(record)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return data as AdminStaff;
+    }
+    const store = readLocalStore();
+    if (!store.admin_staff) store.admin_staff = [];
+    store.admin_staff.push(record);
+    writeLocalStore(store);
+    return record;
+  },
+
+  async updateAdminStaff(
+    id: string,
+    patch: Partial<Pick<AdminStaff, 'full_name' | 'password_hash' | 'role' | 'permissions_json' | 'is_active' | 'last_login_at'>>
+  ): Promise<AdminStaff | null> {
+    const now = new Date().toISOString();
+    const safePatch = {
+      ...patch,
+      ...(patch.permissions_json
+        ? { permissions_json: patch.permissions_json.filter((p) => p !== 'staff') }
+        : {}),
+      updated_at: now,
+    };
+    if (isSupabaseConfigured()) {
+      const { data } = await getSupabaseAdmin()!
+        .from('admin_staff')
+        .update(safePatch)
+        .eq('id', id)
+        .select()
+        .maybeSingle();
+      return data as AdminStaff | null;
+    }
+    const store = readLocalStore();
+    if (!store.admin_staff) store.admin_staff = [];
+    const idx = store.admin_staff.findIndex((s) => s.id === id);
+    if (idx === -1) return null;
+    store.admin_staff[idx] = { ...store.admin_staff[idx], ...safePatch };
+    writeLocalStore(store);
+    return store.admin_staff[idx];
+  },
+
+  async deleteAdminStaff(id: string): Promise<void> {
+    if (isSupabaseConfigured()) {
+      await getSupabaseAdmin()!.from('admin_staff').delete().eq('id', id);
+      return;
+    }
+    const store = readLocalStore();
+    store.admin_staff = (store.admin_staff || []).filter((s) => s.id !== id);
+    store.admin_sessions = (store.admin_sessions || []).filter((sess) => sess.staff_id !== id);
+    writeLocalStore(store);
+  },
+
+  async createAdminSession(
+    session: Omit<AdminSession, 'id' | 'created_at' | 'revoked_at'>
+  ): Promise<AdminSession> {
+    const record: AdminSession = {
+      id: crypto.randomUUID(),
+      ...session,
+      revoked_at: null,
+      created_at: new Date().toISOString(),
+    };
+    if (isSupabaseConfigured()) {
+      const { data, error } = await getSupabaseAdmin()!
+        .from('admin_sessions')
+        .insert(record)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return data as AdminSession;
+    }
+    const store = readLocalStore();
+    if (!store.admin_sessions) store.admin_sessions = [];
+    store.admin_sessions.push(record);
+    writeLocalStore(store);
+    return record;
+  },
+
+  async getAdminSessionByTokenHash(tokenHash: string): Promise<AdminSession | null> {
+    if (isSupabaseConfigured()) {
+      const { data } = await getSupabaseAdmin()!
+        .from('admin_sessions')
+        .select('*')
+        .eq('token_hash', tokenHash)
+        .is('revoked_at', null)
+        .maybeSingle();
+      return data as AdminSession | null;
+    }
+    return (
+      (readLocalStore().admin_sessions || []).find(
+        (s) => s.token_hash === tokenHash && !s.revoked_at
+      ) || null
+    );
+  },
+
+  async revokeAdminSession(tokenHash: string): Promise<void> {
+    const now = new Date().toISOString();
+    if (isSupabaseConfigured()) {
+      await getSupabaseAdmin()!
+        .from('admin_sessions')
+        .update({ revoked_at: now })
+        .eq('token_hash', tokenHash);
+      return;
+    }
+    const store = readLocalStore();
+    if (!store.admin_sessions) return;
+    store.admin_sessions = store.admin_sessions.map((s) =>
+      s.token_hash === tokenHash ? { ...s, revoked_at: now } : s
+    );
+    writeLocalStore(store);
+  },
+
+  async revokeStaffSessions(staffId: string): Promise<void> {
+    const now = new Date().toISOString();
+    if (isSupabaseConfigured()) {
+      await getSupabaseAdmin()!
+        .from('admin_sessions')
+        .update({ revoked_at: now })
+        .eq('staff_id', staffId)
+        .is('revoked_at', null);
+      return;
+    }
+    const store = readLocalStore();
+    if (!store.admin_sessions) return;
+    store.admin_sessions = store.admin_sessions.map((s) =>
+      s.staff_id === staffId && !s.revoked_at ? { ...s, revoked_at: now } : s
+    );
+    writeLocalStore(store);
   },
 };
 

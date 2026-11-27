@@ -21,8 +21,13 @@ import type {
   Order,
   SupportMessage,
   User,
-  UserRole,
 } from '@/lib/types';
+
+export interface NotificationRecipient {
+  id: string;
+  full_name: string;
+  phone: string;
+}
 
 export interface EnrichedAdminUser extends User {
   ordersCount: number;
@@ -55,7 +60,7 @@ export function AdminUsersTab({
 
   const updateUserField = async (
     userId: string,
-    patch: { is_banned?: boolean; kyc_status?: KycStatus; kyc_note?: string | null; role?: UserRole }
+    patch: { is_banned?: boolean; kyc_status?: KycStatus; kyc_note?: string | null }
   ) => {
     setMsg('');
     const res = await fetch('/api/admin/users', {
@@ -64,7 +69,7 @@ export function AdminUsersTab({
       body: JSON.stringify({ userId, ...patch }),
     });
     if (res.ok) {
-      setMsg('تم تحديث بيانات المستخدم وإرسال التنبيه اللازم بنجاح.');
+      setMsg('تم تحديث بيانات العميل وإرسال التنبيه اللازم بنجاح.');
       setReverifyUserId(null);
       setReverifyNote('');
       onReload();
@@ -198,17 +203,9 @@ export function AdminUsersTab({
                     <span>طلب إعادة توثيق</span>
                   </button>
 
-                  <select
-                    value={u.role}
-                    onChange={(e) => updateUserField(u.id, { role: e.target.value as UserRole })}
-                    className="rounded-lg bg-[#0B1730] border border-white/15 px-2.5 py-1.5 text-[11px] text-sky-300"
-                  >
-                    <option value="user">مستخدم</option>
-                    <option value="support">دعم فني</option>
-                    <option value="finance">مراجعة مالية</option>
-                    <option value="admin">مشرف</option>
-                    <option value="super_admin">مدير عام</option>
-                  </select>
+                  <span className="px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[11px] text-slate-300 font-semibold">
+                    حساب عميل
+                  </span>
 
                   <button
                     type="button"
@@ -259,12 +256,12 @@ export function AdminUsersTab({
 }
 
 export function AdminNotificationsTab({
-  users,
+  recipients,
   templates,
   logs,
   onReload,
 }: {
-  users: EnrichedAdminUser[];
+  recipients: NotificationRecipient[];
   templates: NotificationTemplate[];
   logs: AppNotification[];
   onReload: () => void;
@@ -356,8 +353,8 @@ export function AdminNotificationsTab({
             onChange={(e) => setTargetUserId(e.target.value)}
             className="rounded-xl bg-[#071124] border border-white/15 px-3 py-2 text-white"
           >
-            <option value="all">جميع المستخدمين ({users.length})</option>
-            {users.map((u) => (
+            <option value="all">جميع المستخدمين ({recipients.length})</option>
+            {recipients.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.full_name} (+{u.phone})
               </option>
@@ -432,7 +429,7 @@ export function AdminNotificationsTab({
         <h2 className="text-sm font-bold text-white">سجل الإشعارات المرسلة ({logs.length})</h2>
         <div className="space-y-2 max-h-72 overflow-y-auto">
           {logs.slice(0, 30).map((log) => {
-            const recipient = users.find((u) => u.id === log.user_id);
+            const recipient = recipients.find((u) => u.id === log.user_id);
             return (
               <div key={log.id} className="rounded-xl bg-[#071124] border border-white/10 p-3 text-xs flex justify-between gap-3">
                 <div className="min-w-0">
