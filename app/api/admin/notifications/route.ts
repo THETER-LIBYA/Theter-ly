@@ -69,6 +69,9 @@ export async function POST(req: NextRequest) {
     const notifType = body.type || 'promotions';
     let sentCount = 0;
     let pushCount = 0;
+    let failedCount = 0;
+    let subscribedDevices = 0;
+    let lastError: string | null = null;
 
     if (body.targetUserId === 'all' || !body.targetUserId) {
       const users = await db.listUsers();
@@ -82,11 +85,15 @@ export async function POST(req: NextRequest) {
               fallbackTitle: body.title!.trim(),
               fallbackBody: body.body!.trim(),
               actionUrl: body.actionUrl?.trim() || '/notifications',
+              forceDeliver: true,
             })
           )
       );
       sentCount = results.filter((r) => r.inAppSent).length;
       pushCount = results.reduce((sum, r) => sum + r.pushSentCount, 0);
+      failedCount = results.reduce((sum, r) => sum + (r.pushFailedCount || 0), 0);
+      subscribedDevices = results.reduce((sum, r) => sum + (r.activeSubscriptions || 0), 0);
+      lastError = results.find((r) => r.lastError)?.lastError || null;
     } else {
       const r = await dispatchNotification({
         userId: body.targetUserId,
@@ -94,9 +101,13 @@ export async function POST(req: NextRequest) {
         fallbackTitle: body.title.trim(),
         fallbackBody: body.body.trim(),
         actionUrl: body.actionUrl?.trim() || '/notifications',
+        forceDeliver: true,
       });
       sentCount = r.inAppSent ? 1 : 0;
       pushCount = r.pushSentCount;
+      failedCount = r.pushFailedCount || 0;
+      subscribedDevices = r.activeSubscriptions || 0;
+      lastError = r.lastError || null;
     }
 
     await db.appendAuditLog({
@@ -105,11 +116,18 @@ export async function POST(req: NextRequest) {
       action: 'ADMIN_NOTIFICATION_SENT',
       target_type: 'notification',
       target_id: body.targetUserId || 'all',
-      details_json: { title: body.title, sentCount, pushCount },
+      details_json: { title: body.title, sentCount, pushCount, failedCount, subscribedDevices },
       ip_address: getClientIp(req),
     });
 
-    return NextResponse.json({ ok: true, sentCount, pushCount });
+    return NextResponse.json({
+      ok: true,
+      sentCount,
+      pushCount,
+      failedCount,
+      subscribedDevices,
+      lastError,
+    });
   }
 
   return NextResponse.json({ error: 'إجراء غير صالح' }, { status: 400 });

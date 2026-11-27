@@ -1,4 +1,4 @@
-const SW_VERSION = 'tl-sw-v1.2.0';
+const SW_VERSION = 'tl-sw-v1.3.0';
 const STATIC_CACHE = `tether-libya-static-${SW_VERSION}`;
 const STATIC_ASSETS = [
   '/offline',
@@ -84,7 +84,23 @@ self.addEventListener('fetch', (event) => {
   }
 });
 
-// Web Push Notifications Handler (System-level heads-up / lock-screen alerts)
+async function resolveSafeIconUrl(candidate) {
+  if (!candidate || candidate === '/pwa-192x192.png') {
+    return '/pwa-192x192.png';
+  }
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1200);
+    const res = await fetch(candidate, { method: 'HEAD', signal: controller.signal });
+    clearTimeout(timer);
+    if (res.ok) return candidate;
+  } catch {
+    // Fall back to pre-cached static icon
+  }
+  return '/pwa-192x192.png';
+}
+
+// Web Push Notifications Handler (System-level heads-up / lock-screen alerts + open window sync)
 self.addEventListener('push', (event) => {
   let data = {
     title: 'تيتر ليبيا | Tether Libya',
@@ -106,19 +122,41 @@ self.addEventListener('push', (event) => {
   }
 
   event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: data.icon || '/pwa-192x192.png',
-      badge: data.badge || '/pwa-192x192.png',
-      tag: data.tag || `tl-notif-${Date.now()}`,
-      renotify: true,
-      vibrate: [200, 100, 200],
-      timestamp: Date.now(),
-      silent: false,
-      dir: 'rtl',
-      lang: 'ar',
-      data: { url: data.url || '/notifications' },
-    })
+    (async () => {
+      const safeIcon = await resolveSafeIconUrl(data.icon);
+
+      await self.registration.showNotification(data.title, {
+        body: data.body,
+        icon: safeIcon,
+        badge: '/pwa-192x192.png',
+        tag: data.tag || `tl-notif-${Date.now()}`,
+        renotify: true,
+        vibrate: [250, 100, 250],
+        timestamp: Date.now(),
+        silent: false,
+        dir: 'rtl',
+        lang: 'ar',
+        data: { url: data.url || '/notifications' },
+      });
+
+      try {
+        if (typeof BroadcastChannel !== 'undefined') {
+          const bc = new BroadcastChannel('tl-notifications');
+          bc.postMessage({ type: 'TL_PUSH_RECEIVED', notification: data });
+          bc.close();
+        }
+      } catch {
+        // Ignore BroadcastChannel errors
+      }
+
+      const clientList = await self.clients.matchAll({
+        type: 'window',
+        includeUncontrolled: true,
+      });
+      for (const client of clientList) {
+        client.postMessage({ type: 'TL_PUSH_RECEIVED', notification: data });
+      }
+    })()
   );
 });
 

@@ -3,6 +3,8 @@ import { getSessionUser } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { verifyOrigin } from '@/lib/security';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   const user = await getSessionUser(req);
   if (!user) {
@@ -15,7 +17,10 @@ export async function GET(req: NextRequest) {
   ]);
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
-  return NextResponse.json({ notifications, unreadCount, preferences });
+  return NextResponse.json(
+    { notifications, unreadCount, preferences },
+    { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+  );
 }
 
 export async function PATCH(req: NextRequest) {

@@ -287,11 +287,22 @@ export function AdminNotificationsTab({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'send', targetUserId, type, title, body, actionUrl }),
       });
-      const data = (await res.json()) as { sentCount?: number; pushCount?: number; error?: string };
+      const data = (await res.json()) as {
+        sentCount?: number;
+        pushCount?: number;
+        failedCount?: number;
+        subscribedDevices?: number;
+        lastError?: string | null;
+        error?: string;
+      };
       if (res.ok) {
         setTitle('');
         setBody('');
-        setFeedback(`تم الإرسال إلى ${data.sentCount || 0} مستخدم (${data.pushCount || 0} إشعار Web Push).`);
+        const subInfo =
+          data.subscribedDevices === 0
+            ? 'لا توجد أجهزة مفعّلة للإشعارات الخارجية حالياً لدى المستلمين'
+            : `تم توصيل Web Push إلى ${data.pushCount || 0} من أصل ${data.subscribedDevices} جهاز${data.lastError ? ` (ملاحظة: ${data.lastError})` : ''}`;
+        setFeedback(`تم حفظ الإشعار داخل التطبيق لـ ${data.sentCount || 0} مستخدم — ${subInfo}.`);
         onReload();
       } else {
         setFeedback(data.error || 'تعذر الإرسال');

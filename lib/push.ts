@@ -169,12 +169,21 @@ export async function dispatchNotification(params: {
   vars?: Record<string, string | number>;
   orderId?: string | null;
   actionUrl?: string | null;
-}): Promise<{ inAppSent: boolean; pushSentCount: number; pushFailedCount?: number; lastError?: string | null }> {
-  const prefs = await db.getUserNotificationPreferences(params.userId);
-  if (params.type === 'order_updates' && !prefs.order_updates) return { inAppSent: false, pushSentCount: 0 };
-  if (params.type === 'rate_alerts' && !prefs.rate_alerts) return { inAppSent: false, pushSentCount: 0 };
-  if (params.type === 'promotions' && !prefs.promotions) return { inAppSent: false, pushSentCount: 0 };
-  if (params.type === 'admin_alerts' && !prefs.admin_alerts) return { inAppSent: false, pushSentCount: 0 };
+  forceDeliver?: boolean;
+}): Promise<{
+  inAppSent: boolean;
+  pushSentCount: number;
+  pushFailedCount?: number;
+  activeSubscriptions?: number;
+  lastError?: string | null;
+}> {
+  if (!params.forceDeliver) {
+    const prefs = await db.getUserNotificationPreferences(params.userId);
+    if (params.type === 'order_updates' && !prefs.order_updates) return { inAppSent: false, pushSentCount: 0 };
+    if (params.type === 'rate_alerts' && !prefs.rate_alerts) return { inAppSent: false, pushSentCount: 0 };
+    if (params.type === 'promotions' && !prefs.promotions) return { inAppSent: false, pushSentCount: 0 };
+    if (params.type === 'admin_alerts' && !prefs.admin_alerts) return { inAppSent: false, pushSentCount: 0 };
+  }
 
   let title = params.fallbackTitle;
   let body = params.fallbackBody;
@@ -195,6 +204,7 @@ export async function dispatchNotification(params: {
 
   let pushSentCount = 0;
   let pushFailedCount = 0;
+  let activeSubscriptions = 0;
   let pushStatus = channelPush ? 'no_subscription' : 'disabled';
   let lastError: string | null = null;
 
@@ -207,6 +217,7 @@ export async function dispatchNotification(params: {
     });
     pushSentCount = delivery.sentCount;
     pushFailedCount = delivery.failedCount;
+    activeSubscriptions = delivery.activeSubscriptions;
     lastError = delivery.lastError;
     if (pushSentCount > 0) {
       pushStatus = 'delivered';
@@ -227,18 +238,53 @@ export async function dispatchNotification(params: {
     });
   }
 
-  return { inAppSent: channelInApp, pushSentCount, pushFailedCount, lastError };
+  return {
+    inAppSent: channelInApp,
+    pushSentCount,
+    pushFailedCount,
+    activeSubscriptions,
+    lastError,
+  };
 }
 
 export async function sendWebPushTest(userId: string) {
   const siteContent = await db.getSiteContent().catch(() => null);
   const appName = siteContent?.app_name_ar || 'تيتر ليبيا';
-  return deliverPushToUser(userId, {
-    title: `${appName} — إشعار تجريبي مباشر`,
-    body: 'تصل الإشعارات الخارجية على جهازك بنجاح حتى عند إغلاق التطبيق.',
+  const title = `${appName} — إشعار تجريبي مباشر`;
+  const body = 'تصل الإشعارات الخارجية على جهازك بنجاح حتى عند إغلاق التطبيق.';
+
+  const delivery = await deliverPushToUser(userId, {
+    title,
+    body,
     url: '/notifications',
     tag: `tl-test-${Date.now()}`,
   });
+
+  const pushStatus =
+    delivery.sentCount > 0
+      ? 'delivered'
+      : delivery.activeSubscriptions > 0
+        ? delivery.lastError
+          ? `failed:${delivery.lastError.slice(0, 60)}`
+          : 'failed'
+        : 'no_subscription';
+
+  const notification = await db
+    .createNotification({
+      user_id: userId,
+      order_id: null,
+      type: 'order_updates',
+      title,
+      body,
+      action_url: '/notifications',
+      push_status: pushStatus,
+    })
+    .catch(() => null);
+
+  return {
+    ...delivery,
+    notification,
+  };
 }
 
 export async function notifyAllAdmins(params: {

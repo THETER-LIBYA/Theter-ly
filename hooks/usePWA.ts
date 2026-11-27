@@ -55,6 +55,8 @@ export function usePWA(options?: UsePWAOptions) {
   const [pushSupported, setPushSupported] = useState(false);
   const [pushPermission, setPushPermission] = useState<NotificationPermission>('default');
   const [isPushSubscribed, setIsPushSubscribed] = useState(false);
+  const [swActive, setSwActive] = useState(false);
+  const [serverSubscribedCount, setServerSubscribedCount] = useState<number>(0);
   const [syncingPush, setSyncingPush] = useState(false);
 
   const syncedKeyRef = useRef<string>('');
@@ -112,6 +114,14 @@ export function usePWA(options?: UsePWAOptions) {
           }
         } else {
           setIsPushSubscribed(Boolean(sub && !activeUserId));
+        }
+
+        if (activeUserId) {
+          const checkRes = await fetch('/api/push/subscribe', { cache: 'no-store' }).catch(() => null);
+          if (checkRes && checkRes.ok) {
+            const checkData = (await checkRes.json()) as { subscribedCount?: number };
+            setServerSubscribedCount(checkData.subscribedCount || 0);
+          }
         }
       } catch {
         // Ignore transient sync errors in unsupported frames
@@ -176,6 +186,10 @@ export function usePWA(options?: UsePWAOptions) {
           });
 
           const readyReg = await navigator.serviceWorker.ready;
+          if (readyReg.waiting) {
+            readyReg.waiting.postMessage({ type: 'SKIP_WAITING' });
+          }
+          setSwActive(Boolean(readyReg.active));
           await syncSubscriptionForActor(readyReg, userId);
         })
         .catch(() => {
@@ -262,6 +276,7 @@ export function usePWA(options?: UsePWAOptions) {
         syncedKeyRef.current = `${userId}:${json.endpoint}`;
       }
       setIsPushSubscribed(true);
+      setServerSubscribedCount((c) => Math.max(1, c));
       return { ok: true };
     } catch (err) {
       return {
@@ -288,30 +303,109 @@ export function usePWA(options?: UsePWAOptions) {
     }
     syncedKeyRef.current = '';
     setIsPushSubscribed(false);
+    setServerSubscribedCount(0);
   }, [swRegistration]);
 
   const sendTestPush = useCallback(async () => {
     const ensure = await subscribeToPush();
     if (!ensure.ok) {
-      return { ok: false, sentCount: 0, error: ensure.error };
+      return {
+        ok: false,
+        sentCount: 0,
+        swReceivedPush: false,
+        localFallbackShown: false,
+        error: ensure.error,
+      };
     }
-    const res = await fetch('/api/push/test', { method: 'POST' });
-    const data = (await res.json()) as {
-      ok?: boolean;
-      sentCount?: number;
-      failedCount?: number;
-      lastError?: string | null;
-      error?: string;
+
+    let swReceivedPush = false;
+    let bc: BroadcastChannel | null = null;
+    const onSwMsg = (event: MessageEvent) => {
+      if (event.data?.type === 'TL_PUSH_RECEIVED') {
+        swReceivedPush = true;
+      }
     };
-    if (!res.ok) {
-      return { ok: false, sentCount: 0, error: data.error || 'فشل إرسال الإشعار التجريبي' };
+
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        bc = new BroadcastChannel('tl-notifications');
+        bc.onmessage = (ev) => {
+          if (ev.data?.type === 'TL_PUSH_RECEIVED') {
+            swReceivedPush = true;
+          }
+        };
+      }
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('message', onSwMsg);
+      }
+
+      const res = await fetch('/api/push/test', { method: 'POST' });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        sentCount?: number;
+        failedCount?: number;
+        activeSubscriptions?: number;
+        lastError?: string | null;
+        error?: string;
+      };
+
+      window.dispatchEvent(new CustomEvent('tl:refresh-notifications'));
+
+      if (!res.ok) {
+        return {
+          ok: false,
+          sentCount: 0,
+          swReceivedPush: false,
+          localFallbackShown: false,
+          error: data.error || 'فشل إرسال الإشعار التجريبي',
+        };
+      }
+
+      // Wait briefly to see if FCM/APNs push delivered back to the device Service Worker
+      if (data.ok && (data.sentCount || 0) > 0) {
+        const deadline = Date.now() + 2400;
+        while (!swReceivedPush && Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 150));
+        }
+      }
+
+      // If browser supports SW notifications and remote FCM didn't reach the tab within 2.4s,
+      // trigger a local Service Worker banner check to verify OS notification permissions & channel.
+      let localFallbackShown = false;
+      if (!swReceivedPush && 'serviceWorker' in navigator && Notification.permission === 'granted') {
+        try {
+          const reg = await navigator.serviceWorker.ready;
+          await reg.showNotification('تيتر ليبيا — اختبار إشعار النظام', {
+            body: 'صلاحية الإشعارات على جهازك تعمل! إذا لم يصلك الإشعار السحابي فتأكد من عدم حجب VPN أو DNS لخدمة الإشعارات.',
+            icon: '/pwa-192x192.png',
+            badge: '/pwa-192x192.png',
+            tag: `tl-local-check-${Date.now()}`,
+            renotify: true,
+            dir: 'rtl',
+            lang: 'ar',
+            data: { url: '/notifications' },
+          } as NotificationOptions);
+          localFallbackShown = true;
+        } catch {
+          localFallbackShown = false;
+        }
+      }
+
+      return {
+        ok: Boolean(data.ok),
+        sentCount: data.sentCount || 0,
+        failedCount: data.failedCount || 0,
+        activeSubscriptions: data.activeSubscriptions || 0,
+        lastError: data.lastError || null,
+        swReceivedPush,
+        localFallbackShown,
+      };
+    } finally {
+      if (bc) bc.close();
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', onSwMsg);
+      }
     }
-    return {
-      ok: Boolean(data.ok),
-      sentCount: data.sentCount || 0,
-      failedCount: data.failedCount || 0,
-      lastError: data.lastError || null,
-    };
   }, [subscribeToPush]);
 
   return {
@@ -323,6 +417,8 @@ export function usePWA(options?: UsePWAOptions) {
     pushSupported,
     pushPermission,
     isPushSubscribed,
+    swActive,
+    serverSubscribedCount,
     syncingPush,
     installApp,
     applyUpdate,

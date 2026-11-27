@@ -1366,7 +1366,7 @@ export const db = {
     if (isSupabaseConfigured()) {
       const { data } = await getSupabaseAdmin()!
         .from('user_notification_preferences')
-        .upsert(updated)
+        .upsert(updated, { onConflict: 'user_id' })
         .select()
         .single();
       return (data || updated) as UserNotificationPreferences;

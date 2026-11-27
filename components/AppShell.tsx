@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -26,7 +26,7 @@ import {
   X,
 } from 'lucide-react';
 import { usePWA } from '@/hooks/usePWA';
-import type { SiteContent, User } from '@/lib/types';
+import type { AppNotification, SiteContent, User } from '@/lib/types';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -63,6 +63,9 @@ export function AppShell({
   const [showSmartInstallBar, setShowSmartInstallBar] = useState(false);
   const [pwaDismissed, setPwaDismissed] = useState(false);
   const [pushPromptDismissed, setPushPromptDismissed] = useState(false);
+  const [polledUnread, setPolledUnread] = useState<number | null>(null);
+  const [liveToast, setLiveToast] = useState<{ title: string; body: string; url: string } | null>(null);
+  const lastSeenNotifIdRef = useRef<string | null>(null);
   const {
     isInstallable,
     isInstalled,
@@ -85,6 +88,110 @@ export function AppShell({
   const isLockedGate = Boolean(
     hideBottomNav || !user || !user.terms_accepted_at || !user.onboarding_completed
   );
+  const activeUnreadCount = polledUnread ?? unreadNotifications;
+
+  const refreshLiveNotifications = useCallback(async (showBannerOnNew: boolean) => {
+    if (!user?.id || isLockedGate) return;
+    try {
+      const res = await fetch('/api/notifications', { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        notifications?: AppNotification[];
+        unreadCount?: number;
+      };
+      if (typeof data.unreadCount === 'number') {
+        setPolledUnread(data.unreadCount);
+      }
+      const list = data.notifications || [];
+      const newest = list[0];
+      if (newest) {
+        const prevSeen = lastSeenNotifIdRef.current;
+        lastSeenNotifIdRef.current = newest.id;
+        if (showBannerOnNew && prevSeen && prevSeen !== newest.id && !newest.is_read) {
+          setLiveToast({
+            title: newest.title,
+            body: newest.body,
+            url: newest.action_url || '/notifications',
+          });
+        }
+      }
+      window.dispatchEvent(new CustomEvent('tl:notifications-updated', { detail: data }));
+    } catch {
+      // Ignore transient network errors
+    }
+  }, [user?.id, isLockedGate]);
+
+  useEffect(() => {
+    if (!user?.id || isLockedGate) return;
+
+    const initialTimer = setTimeout(() => {
+      void refreshLiveNotifications(false);
+    }, 350);
+
+    const pollInterval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void refreshLiveNotifications(true);
+      }
+    }, 10000);
+
+    const onFocusOrVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshLiveNotifications(true);
+      }
+    };
+    const onManualRefresh = () => {
+      void refreshLiveNotifications(true);
+    };
+
+    window.addEventListener('focus', onFocusOrVisible);
+    document.addEventListener('visibilitychange', onFocusOrVisible);
+    window.addEventListener('tl:refresh-notifications', onManualRefresh);
+
+    let bc: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      bc = new BroadcastChannel('tl-notifications');
+      bc.onmessage = (ev) => {
+        if (ev.data?.type === 'TL_PUSH_RECEIVED') {
+          const n = ev.data.notification as { title?: string; body?: string; url?: string } | undefined;
+          if (n?.title) {
+            setLiveToast({
+              title: n.title,
+              body: n.body || '',
+              url: n.url || '/notifications',
+            });
+          }
+          void refreshLiveNotifications(false);
+        }
+      };
+    }
+
+    const onSwMessage = (ev: MessageEvent) => {
+      if (ev.data?.type === 'TL_PUSH_RECEIVED') {
+        void refreshLiveNotifications(true);
+      }
+    };
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', onSwMessage);
+    }
+
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(pollInterval);
+      window.removeEventListener('focus', onFocusOrVisible);
+      document.removeEventListener('visibilitychange', onFocusOrVisible);
+      window.removeEventListener('tl:refresh-notifications', onManualRefresh);
+      if (bc) bc.close();
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', onSwMessage);
+      }
+    };
+  }, [user?.id, isLockedGate, refreshLiveNotifications]);
+
+  useEffect(() => {
+    if (!liveToast) return;
+    const t = setTimeout(() => setLiveToast(null), 6500);
+    return () => clearTimeout(t);
+  }, [liveToast]);
 
   useEffect(() => {
     if (pwaDismissed || isInstalled || (!isInstallable && !isIOS)) return;
@@ -246,14 +353,41 @@ export function AppShell({
               className="relative w-11 h-11 rounded-2xl bg-[#0D1A33]/90 border border-white/10 flex items-center justify-center text-slate-100 hover:border-emerald-400/40 active:scale-95 transition shadow-lg"
             >
               <Bell className="w-5 h-5" />
-              {user && unreadNotifications > 0 && (
+              {user && activeUnreadCount > 0 && (
                 <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 rounded-full bg-red-500 text-white text-[11px] font-bold flex items-center justify-center shadow-md tabular-nums">
-                  {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                  {activeUnreadCount > 99 ? '99+' : activeUnreadCount}
                 </span>
               )}
             </Link>
           )}
         </header>
+
+        {/* Real-Time In-App Notification Toast */}
+        {!isLockedGate && liveToast && (
+          <div className="fixed top-3 left-4 right-4 max-w-md mx-auto z-50 rounded-2xl bg-[#0B1C38]/95 border border-[#10F5A6]/45 p-3.5 shadow-[0_14px_40px_rgba(0,0,0,0.6)] backdrop-blur-xl flex items-start justify-between gap-3">
+            <Link
+              href={liveToast.url || '/notifications'}
+              onClick={() => setLiveToast(null)}
+              className="flex items-start gap-2.5 min-w-0 flex-1"
+            >
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-[#10F5A6] flex items-center justify-center shrink-0 mt-0.5">
+                <Bell className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-extrabold text-white truncate">{liveToast.title}</p>
+                <p className="text-[11px] text-slate-300 line-clamp-2 mt-0.5">{liveToast.body}</p>
+              </div>
+            </Link>
+            <button
+              type="button"
+              aria-label="إغلاق التنبيه"
+              onClick={() => setLiveToast(null)}
+              className="p-1 rounded-lg text-slate-400 hover:text-white shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* Tagline row */}
         <div className="flex items-center justify-center gap-3 mb-4">
