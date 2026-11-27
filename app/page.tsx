@@ -6,12 +6,13 @@ import { OnboardingFlow } from '@/components/OnboardingFlow';
 import { getSessionUser } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getOrRefreshRates } from '@/lib/prices';
+import { getOfficialSiteUrl, toOfficialAbsoluteUrl } from '@/lib/seo';
 import type { Order } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
-  const baseUrl = process.env.APP_URL?.replace(/\/$/, '') || 'https://tetherlibya.ly';
+  const baseUrl = getOfficialSiteUrl();
   const [siteContent, user] = await Promise.all([
     db.getSiteContent(),
     getSessionUser(),
@@ -23,7 +24,7 @@ export default async function HomePage() {
       '@type': 'Organization',
       name: `${siteContent.app_name_ar} | ${siteContent.app_name_en}`,
       url: baseUrl,
-      logo: `${baseUrl}${siteContent.logo_url || '/images/brand-icon.png'}`,
+      logo: toOfficialAbsoluteUrl(siteContent.logo_url, '/images/brand-icon.png'),
       contactPoint: {
         '@type': 'ContactPoint',
         telephone: siteContent.support_phone,

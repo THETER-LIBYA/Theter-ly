@@ -1,10 +1,11 @@
 import type { MetadataRoute } from 'next';
 import { db } from '@/lib/db';
+import { getOfficialSiteUrl } from '@/lib/seo';
 
 export const dynamic = 'force-dynamic';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.APP_URL?.replace(/\/$/, '') || 'https://tetherlibya.ly';
+  const baseUrl = getOfficialSiteUrl();
   const [seoList, content] = await Promise.all([db.listSeoSettings(), db.getSiteContent()]);
   const pages = content.public_pages_json || {};
 

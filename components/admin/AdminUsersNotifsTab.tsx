@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import {
   AlertTriangle,
   Bell,
-  ExternalLink,
+  Eye,
   MapPin,
   MessageSquare,
   Search,
@@ -22,6 +22,7 @@ import type {
   SupportMessage,
   User,
 } from '@/lib/types';
+import { AdminDocumentViewerModal, type ViewerDocument } from './AdminDocumentViewerModal';
 
 export interface NotificationRecipient {
   id: string;
@@ -45,6 +46,35 @@ export function AdminUsersTab({
   const [msg, setMsg] = useState('');
   const [reverifyUserId, setReverifyUserId] = useState<string | null>(null);
   const [reverifyNote, setReverifyNote] = useState('');
+  const [viewerDocs, setViewerDocs] = useState<ViewerDocument[]>([]);
+  const [viewerIndex, setViewerIndex] = useState(0);
+  const [viewerOpen, setViewerOpen] = useState(false);
+
+  const openKycModal = (u: EnrichedAdminUser, initialDoc: 'passport' | 'birth') => {
+    const docs: ViewerDocument[] = [];
+    const displayName =
+      u.first_name && u.last_name ? `${u.first_name} ${u.last_name}` : u.full_name;
+    if (u.passport_image_url) {
+      docs.push({
+        title: `جواز السفر — ${displayName}`,
+        subtitle: `+${u.phone} · ${u.city_area || 'ليبيا'}`,
+        url: u.passport_image_url,
+      });
+    }
+    if (u.birth_cert_image_url) {
+      docs.push({
+        title: `شهادة الميلاد — ${displayName}`,
+        subtitle: `+${u.phone} · ${u.city_area || 'ليبيا'}`,
+        url: u.birth_cert_image_url,
+      });
+    }
+    if (docs.length === 0) return;
+    const idx =
+      initialDoc === 'birth' && u.passport_image_url && u.birth_cert_image_url ? 1 : 0;
+    setViewerDocs(docs);
+    setViewerIndex(idx);
+    setViewerOpen(true);
+  };
 
   const filtered = users.filter((u) => {
     const q = query.trim();
@@ -140,26 +170,24 @@ export function AdminUsersTab({
                   {(u.passport_image_url || u.birth_cert_image_url) && (
                     <div className="flex flex-wrap items-center gap-2 pt-1">
                       {u.passport_image_url && (
-                        <a
-                          href={u.passport_image_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/15 border border-sky-400/30 text-sky-300 hover:bg-sky-500/25 font-semibold text-[11px]"
+                        <button
+                          type="button"
+                          onClick={() => openKycModal(u, 'passport')}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-500/15 border border-sky-400/30 text-sky-300 hover:bg-sky-500/25 font-semibold text-[11px] transition"
                         >
-                          <ExternalLink className="w-3 h-3" />
-                          <span>عرض جواز السفر</span>
-                        </a>
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>معاينة جواز السفر</span>
+                        </button>
                       )}
                       {u.birth_cert_image_url && (
-                        <a
-                          href={u.birth_cert_image_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-400/30 text-[#10F5A6] hover:bg-emerald-500/25 font-semibold text-[11px]"
+                        <button
+                          type="button"
+                          onClick={() => openKycModal(u, 'birth')}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-400/30 text-[#10F5A6] hover:bg-emerald-500/25 font-semibold text-[11px] transition"
                         >
-                          <ExternalLink className="w-3 h-3" />
-                          <span>عرض شهادة الميلاد</span>
-                        </a>
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>معاينة شهادة الميلاد</span>
+                        </button>
                       )}
                     </div>
                   )}
@@ -251,6 +279,12 @@ export function AdminUsersTab({
           ))}
         </div>
       )}
+      <AdminDocumentViewerModal
+        documents={viewerDocs}
+        initialIndex={viewerIndex}
+        open={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+      />
     </div>
   );
 }

@@ -71,6 +71,7 @@ export async function GET(
       return new NextResponse(arrayBuffer, {
         headers: {
           ...commonHeaders,
+          'Content-Disposition': 'inline',
           'Content-Type': MIME_MAP[ext] || 'application/octet-stream',
         },
       });
@@ -90,6 +91,7 @@ export async function GET(
   return new NextResponse(buffer, {
     headers: {
       ...commonHeaders,
+      'Content-Disposition': 'inline',
       'Content-Type': MIME_MAP[ext] || 'application/octet-stream',
     },
   });

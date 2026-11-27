@@ -1,7 +1,8 @@
 import type { MetadataRoute } from 'next';
+import { getOfficialSiteUrl } from '@/lib/seo';
 
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = process.env.APP_URL?.replace(/\/$/, '') || 'https://tetherlibya.ly';
+  const baseUrl = getOfficialSiteUrl();
 
   return {
     rules: [

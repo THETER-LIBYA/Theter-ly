@@ -4,6 +4,7 @@ import { AppShell } from '@/components/AppShell';
 import { JsonLd } from '@/components/JsonLd';
 import { requireOnboardedUser } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { getOfficialSiteUrl } from '@/lib/seo';
 
 interface PublicInfoPageProps {
   slug: string;
@@ -19,7 +20,7 @@ export async function PublicInfoPage({
   faqItems,
 }: PublicInfoPageProps) {
   const user = await requireOnboardedUser();
-  const baseUrl = process.env.APP_URL?.replace(/\/$/, '') || 'https://tetherlibya.ly';
+  const baseUrl = getOfficialSiteUrl();
   const [siteContent, seo, notifs] = await Promise.all([
     db.getSiteContent(),
     db.getSeoSetting(slug),
