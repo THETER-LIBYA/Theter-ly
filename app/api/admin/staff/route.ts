@@ -43,16 +43,16 @@ async function requireSuperAdmin(req: NextRequest) {
   return check;
 }
 
-const VALID_STAFF_ROLES: StaffRole[] = ['support', 'finance', 'marketing', 'manager'];
 const USERNAME_REGEX = /^[a-zA-Z0-9_.-]{3,32}$/;
 
 export async function GET(req: NextRequest) {
   const check = await requireSuperAdmin(req);
   if (!check.ok) return check.response;
 
-  const list = await db.listAdminStaff();
+  const [list, roles] = await Promise.all([db.listAdminStaff(), db.listAdminRoles()]);
   return NextResponse.json({
     staff: list.map(sanitizeStaff),
+    roles,
     roleLabels: STAFF_ROLE_LABELS,
     roleDefaultPermissions: STAFF_ROLE_DEFAULT_PERMISSIONS,
     permissionLabels: ADMIN_PERMISSION_LABELS,
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
   const fullName = (body.full_name || '').trim();
   const username = (body.username || '').trim().toLowerCase();
   const password = body.password || '';
-  const role = body.role;
+  const roleSlug = (body.role || '').trim().toLowerCase();
 
   if (fullName.length < 2) {
     return NextResponse.json({ error: 'يرجى إدخال الاسم الكامل للموظف' }, { status: 400 });
@@ -95,8 +95,11 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
-  if (!role || !VALID_STAFF_ROLES.includes(role)) {
-    return NextResponse.json({ error: 'الدور الوظيفي المختار غير صالح' }, { status: 400 });
+
+  const matchedRole = await db.getAdminRoleBySlug(roleSlug);
+  const defaultRolePerms = matchedRole?.permissions_json || STAFF_ROLE_DEFAULT_PERMISSIONS[roleSlug];
+  if (!matchedRole && !defaultRolePerms) {
+    return NextResponse.json({ error: 'الدور الوظيفي المختار غير موجود' }, { status: 400 });
   }
 
   const existing = await db.getAdminStaffByUsername(username);
@@ -110,13 +113,13 @@ export async function POST(req: NextRequest) {
       )
     : [];
   const permissions =
-    requestedPerms.length > 0 ? Array.from(new Set(requestedPerms)) : STAFF_ROLE_DEFAULT_PERMISSIONS[role];
+    requestedPerms.length > 0 ? Array.from(new Set(requestedPerms)) : defaultRolePerms || ['overview'];
 
   const created = await db.createAdminStaff({
     full_name: fullName,
     username,
     password_hash: hashPassword(password),
-    role,
+    role: roleSlug,
     permissions_json: permissions,
   });
 
@@ -167,10 +170,12 @@ export async function PATCH(req: NextRequest) {
     patch.full_name = body.full_name.trim();
   }
   if (body.role) {
-    if (!VALID_STAFF_ROLES.includes(body.role)) {
-      return NextResponse.json({ error: 'الدور الوظيفي غير صالح' }, { status: 400 });
+    const cleanRole = body.role.trim().toLowerCase();
+    const matchedRole = await db.getAdminRoleBySlug(cleanRole);
+    if (!matchedRole && !STAFF_ROLE_DEFAULT_PERMISSIONS[cleanRole]) {
+      return NextResponse.json({ error: 'الدور الوظيفي غير موجود' }, { status: 400 });
     }
-    patch.role = body.role;
+    patch.role = cleanRole;
   }
   if (Array.isArray(body.permissions)) {
     patch.permissions_json = Array.from(

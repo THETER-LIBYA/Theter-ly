@@ -9,6 +9,7 @@ export interface AuthenticatedAdminActor {
   actorType: 'super_admin' | 'staff';
   actorName: string;
   actorRole: string;
+  actorRoleLabel?: string;
   permissions: AdminPermission[];
 }
 

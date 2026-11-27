@@ -279,7 +279,7 @@ export interface SupportMessage {
   updated_at: string;
 }
 
-export type StaffRole = 'support' | 'finance' | 'marketing' | 'manager';
+export type StaffRole = string;
 
 export type AdminPermission =
   | 'overview'
@@ -312,34 +312,149 @@ export const ALL_ADMIN_PERMISSIONS: AdminPermission[] = [
   'staff',
 ];
 
-export const STAFF_ROLE_LABELS: Record<StaffRole | 'super_admin', string> = {
-  super_admin: 'المدير العام',
-  support: 'دعم فني',
-  finance: 'مراجعة مالية',
-  marketing: 'معلن وإدارة محتوى',
-  manager: 'مشرف تشغيلي',
+export const STAFF_ROLE_LABELS: Record<string, string> = {
+  super_admin: 'المالك / المدير العام (Super Admin)',
+  admin: 'مدير النظام (Admin)',
+  finance: 'مدير المدفوعات والمالية (Finance)',
+  support: 'مدير الدعم الفني (Support)',
+  moderator: 'مراقب العمليات (Moderator)',
+  editor: 'محرر المحتوى والإعلانات (Editor)',
+  marketing: 'التسويق والإشعارات (Marketing)',
+  manager: 'مشرف تشغيلي (Manager)',
 };
 
-export const STAFF_ROLE_DEFAULT_PERMISSIONS: Record<StaffRole, AdminPermission[]> = {
-  support: ['overview', 'support', 'users'],
+export const STAFF_ROLE_DEFAULT_PERMISSIONS: Record<string, AdminPermission[]> = {
+  admin: [
+    'overview',
+    'orders',
+    'rates',
+    'payments',
+    'users',
+    'support',
+    'notifications',
+    'content',
+    'seo',
+    'audit',
+  ],
   finance: ['overview', 'orders', 'rates', 'payments', 'audit'],
+  support: ['overview', 'orders', 'users', 'support'],
+  moderator: ['overview', 'orders', 'users', 'support', 'audit'],
+  editor: ['overview', 'notifications', 'content', 'seo'],
   marketing: ['overview', 'notifications', 'content', 'seo'],
-  manager: ['overview', 'orders', 'rates', 'payments', 'users', 'support', 'notifications', 'content', 'seo', 'audit'],
+  manager: [
+    'overview',
+    'orders',
+    'rates',
+    'payments',
+    'users',
+    'support',
+    'notifications',
+    'content',
+    'seo',
+    'audit',
+  ],
 };
 
 export const ADMIN_PERMISSION_LABELS: Record<AdminPermission, string> = {
-  overview: 'الرئيسية والإحصائيات',
-  orders: 'الطلبات والمراجعة المالية',
-  rates: 'إدارة التسعير',
-  payments: 'وسائل الدفع والمحافظ',
-  users: 'المستخدمون وتوثيق الهوية',
-  support: 'رسائل الدعم الفني',
-  notifications: 'إرسال الإشعارات والقوالب',
-  content: 'المحتوى والهوية البصرية',
-  seo: 'إدارة SEO',
-  audit: 'السجل المالي والتدقيق',
-  staff: 'طاقم العمل والأدوار',
+  overview: 'عرض التحليلات والمؤشرات المالية',
+  orders: 'إدارة واستعراض الطلبات',
+  rates: 'إدارة التسعير والهوامش',
+  payments: 'إدارة الحسابات المصرفية والمحافظ',
+  users: 'إدارة سجلات العملاء وتوثيق الهوية',
+  support: 'متابعة وتنفيذ تذاكر الدعم الفني',
+  notifications: 'إدارة الإشعارات والقوالب',
+  content: 'إدارة المحتوى والهوية البصرية',
+  seo: 'إعدادات المنصة وSEO',
+  audit: 'عرض السجل المالي والتدقيق الأمني (Audit)',
+  staff: 'إدارة الأدوار والصلاحيات (RBAC)',
 };
+
+export interface AdminPermissionDirectoryItem {
+  key: AdminPermission;
+  title: string;
+  category: string;
+  description: string;
+}
+
+export const ADMIN_PERMISSIONS_DIRECTORY: AdminPermissionDirectoryItem[] = [
+  {
+    key: 'orders',
+    title: 'إدارة واستعراض الطلبات',
+    category: 'العمليات',
+    description: 'الاطلاع على كافة طلبات الشراء والبيع، فحص إيصالات الدفع ومعاملات TRON، واعتماد أو رفض الطلبات.',
+  },
+  {
+    key: 'rates',
+    title: 'إدارة التسعير والهوامش',
+    category: 'المالية',
+    description: 'تعديل سعر الصرف الأساسي، هوامش الشراء والبيع، حدود الطلبات اليومية، وإيقاف أو تشغيل التداول.',
+  },
+  {
+    key: 'payments',
+    title: 'إدارة الحسابات المصرفية والمحافظ',
+    category: 'المالية',
+    description: 'إضافة وتعديل حسابات المصارف الليبية (LYPay وOnePay والتحويل المصرفي) وعناوين محافظ TRON (TRC20).',
+  },
+  {
+    key: 'users',
+    title: 'إدارة سجلات العملاء وتوثيق الهوية',
+    category: 'المستخدمون',
+    description: 'مراجعة جوازات السفر وشهادات الميلاد، اعتماد التوثيق أو طلب إعادة التوثيق، وتعليق أو تفعيل حسابات العملاء.',
+  },
+  {
+    key: 'support',
+    title: 'متابعة وتنفيذ تذاكر الدعم الفني',
+    category: 'الدعم والخدمات',
+    description: 'استعراض رسائل العملاء من صفحة التواصل وتحديث حالة المعالجة وإضافة ملاحظات فريق الدعم.',
+  },
+  {
+    key: 'notifications',
+    title: 'إدارة الإشعارات والقوالب',
+    category: 'التسويق والتواصل',
+    description: 'إرسال إشعارات جماعية أو مخصصة داخل التطبيق وعبر Web Push وضبط قوالب التنبيهات التلقائية.',
+  },
+  {
+    key: 'content',
+    title: 'إدارة المحتوى والهوية البصرية',
+    category: 'المحتوى',
+    description: 'تعديل شعار المنصة وأيقونات التطبيق، البانر الإعلاني، وضع الصيانة، بيانات التواصل، ومحتوى الصفحات العامة.',
+  },
+  {
+    key: 'seo',
+    title: 'إعدادات المنصة وSEO',
+    category: 'النظام',
+    description: 'تحديث عناوين محركات البحث، الكلمات المفتاحية، بيانات OpenGraph وSchema.org لكل صفحة عامة.',
+  },
+  {
+    key: 'overview',
+    title: 'عرض التحليلات والمؤشرات المالية',
+    category: 'التقارير',
+    description: 'الاطلاع على مؤشرات التداول اليومية والأرباح والعمولات وجاهزية التكاملات في لوحة القيادة.',
+  },
+  {
+    key: 'audit',
+    title: 'عرض السجل المالي والتدقيق الأمني (Audit)',
+    category: 'الأمان',
+    description: 'مراقبة القيود المالية غير القابلة للتعديل وسجل كافة العمليات الإدارية الحساسة وعناوين الـ IP.',
+  },
+  {
+    key: 'staff',
+    title: 'إدارة الأدوار والصلاحيات (RBAC)',
+    category: 'الإدارة العليا',
+    description: 'إنشاء الأدوار المخصصة، ضبط مصفوفة الصلاحيات، وتعيين طاقم العمل (حصري للمالك / المدير العام فقط).',
+  },
+];
+
+export interface AdminRoleDefinition {
+  id: string;
+  slug: string;
+  name_ar: string;
+  description_ar: string;
+  permissions_json: AdminPermission[];
+  is_system: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface AdminStaff {
   id: string;
@@ -359,7 +474,7 @@ export interface AdminSession {
   actor_type: 'super_admin' | 'staff';
   staff_id: string | null;
   actor_name: string;
-  actor_role: 'super_admin' | StaffRole;
+  actor_role: string;
   token_hash: string;
   user_agent: string | null;
   ip_address: string | null;
@@ -367,4 +482,5 @@ export interface AdminSession {
   revoked_at: string | null;
   created_at: string;
 }
+
 

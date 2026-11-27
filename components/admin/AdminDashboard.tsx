@@ -41,7 +41,7 @@ import { AdminAuthGate, type AuthenticatedAdminActor } from './AdminAuthGate';
 import { AdminContentTab, AdminSeoTab } from './AdminContentSeoTab';
 import { AdminOrdersTab, type EnrichedOrder } from './AdminOrdersTab';
 import { AdminPaymentsWalletsTab, AdminRatesTab } from './AdminRatesPaymentsTab';
-import { AdminStaffTab, type StaffAccountSummary } from './AdminStaffTab';
+import { AdminStaffTab, type RoleSummary, type StaffAccountSummary } from './AdminStaffTab';
 import {
   AdminNotificationsTab,
   AdminSupportMessagesTab,
@@ -98,6 +98,7 @@ export function AdminDashboard() {
   const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([]);
   const [staffList, setStaffList] = useState<StaffAccountSummary[]>([]);
+  const [rolesList, setRolesList] = useState<RoleSummary[]>([]);
   const [adminPushNote, setAdminPushNote] = useState('');
 
   const {
@@ -208,8 +209,18 @@ export function AdminDashboard() {
         tasks.push(
           fetch('/api/admin/staff').then(async (res) => {
             if (res.ok) {
-              const sd = (await res.json()) as { staff: StaffAccountSummary[] };
+              const sd = (await res.json()) as {
+                staff: StaffAccountSummary[];
+                roles?: RoleSummary[];
+              };
               setStaffList(sd.staff || []);
+              if (sd.roles) setRolesList(sd.roles);
+            }
+          }),
+          fetch('/api/admin/roles').then(async (res) => {
+            if (res.ok) {
+              const rd = (await res.json()) as { roles: RoleSummary[] };
+              setRolesList(rd.roles || []);
             }
           })
         );
@@ -230,6 +241,7 @@ export function AdminDashboard() {
         actorType?: 'super_admin' | 'staff' | null;
         actorName?: string;
         actorRole?: string;
+        actorRoleLabel?: string;
         permissions?: AdminPermission[];
         needsFirstRunClaim: boolean;
       };
@@ -242,6 +254,7 @@ export function AdminDashboard() {
           actorType: data.actorType,
           actorName: data.actorName || 'المدير العام',
           actorRole: data.actorRole || 'super_admin',
+          actorRoleLabel: data.actorRoleLabel,
           permissions: data.permissions || [],
         };
         setActor(authedActor);
@@ -329,7 +342,9 @@ export function AdminDashboard() {
   });
 
   const roleDisplay =
-    STAFF_ROLE_LABELS[actor.actorRole as keyof typeof STAFF_ROLE_LABELS] || actor.actorRole;
+    actor.actorRoleLabel ||
+    STAFF_ROLE_LABELS[actor.actorRole as keyof typeof STAFF_ROLE_LABELS] ||
+    actor.actorRole;
 
   const reloadCurrentActorData = () => {
     void loadPermittedAdminData(actor);
@@ -701,7 +716,11 @@ export function AdminDashboard() {
           )}
 
           {activeTab === 'staff' && actor.actorType === 'super_admin' && (
-            <AdminStaffTab staffList={staffList} onReload={reloadCurrentActorData} />
+            <AdminStaffTab
+              staffList={staffList}
+              roles={rolesList}
+              onReload={reloadCurrentActorData}
+            />
           )}
         </div>
       </div>

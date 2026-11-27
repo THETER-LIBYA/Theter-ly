@@ -7,6 +7,7 @@ import { getSupabaseAdmin, isSupabaseConfigured } from './supabase';
 import {
   AdminAuditLog,
   AdminPermission,
+  AdminRoleDefinition,
   AdminSession,
   AdminStaff,
   AppNotification,
@@ -23,6 +24,9 @@ import {
   PushSubscriptionRecord,
   SeoSetting,
   SiteContent,
+  STAFF_ASSIGNABLE_PERMISSIONS,
+  STAFF_ROLE_DEFAULT_PERMISSIONS,
+  STAFF_ROLE_LABELS,
   StaffRole,
   SupportMessage,
   User,
@@ -33,10 +37,34 @@ import {
 
 export const SUPER_ADMIN_ACTOR_ID = '00000000-0000-4000-8000-000000000001';
 
+const ROLE_DESCRIPTIONS: Record<string, string> = {
+  admin: 'إدارة تشغيلية كاملة لكافة أقسام المنصة باستثناء إدارة الأدوار العليا',
+  finance: 'مراجعة الطلبات، اعتماد الإيصالات، إدارة الحسابات المصرفية والمحافظ، وضبط التسعير',
+  support: 'متابعة تذاكر الدعم الفني ومراجعة توثيق هوية العملاء واستعراض الطلبات',
+  moderator: 'متابعة الطلبات وتوثيق الحسابات والرقابة على السجل الأمني والدعم',
+  editor: 'إدارة الهوية البصرية، الإشعارات، الصفحات العامة، وإعدادات محركات البحث SEO',
+};
+
+function defaultAdminRoles(): AdminRoleDefinition[] {
+  const now = new Date().toISOString();
+  const slugs = ['admin', 'finance', 'support', 'moderator', 'editor'];
+  return slugs.map((slug) => ({
+    id: crypto.randomUUID(),
+    slug,
+    name_ar: STAFF_ROLE_LABELS[slug] || slug,
+    description_ar: ROLE_DESCRIPTIONS[slug] || '',
+    permissions_json: [...(STAFF_ROLE_DEFAULT_PERMISSIONS[slug] || ['overview'])],
+    is_system: true,
+    created_at: now,
+    updated_at: now,
+  }));
+}
+
 interface LocalStore {
   users: User[];
   otp_sessions: OtpSession[];
   user_sessions: UserSession[];
+  admin_roles?: AdminRoleDefinition[];
   admin_staff?: AdminStaff[];
   admin_sessions?: AdminSession[];
   exchange_rates: ExchangeRates;
@@ -339,6 +367,7 @@ function createInitialStore(): LocalStore {
     users: [],
     otp_sessions: [],
     user_sessions: [],
+    admin_roles: defaultAdminRoles(),
     admin_staff: [],
     admin_sessions: [],
     exchange_rates: {
@@ -1728,6 +1757,157 @@ export const db = {
     };
     writeLocalStore(store);
     return store.support_messages[idx];
+  },
+
+  // --- Custom & Built-in Admin Roles (RBAC) ---
+  async listAdminRoles(): Promise<AdminRoleDefinition[]> {
+    if (isSupabaseConfigured()) {
+      const sb = getSupabaseAdmin()!;
+      const { data } = await sb
+        .from('admin_roles')
+        .select('*')
+        .order('is_system', { ascending: false })
+        .order('created_at', { ascending: true });
+      const rows = (data || []) as AdminRoleDefinition[];
+      if (rows.length > 0) return rows;
+
+      const defaults = defaultAdminRoles();
+      const { data: seeded } = await sb
+        .from('admin_roles')
+        .upsert(defaults, { onConflict: 'slug', ignoreDuplicates: true })
+        .select('*');
+      return ((seeded && seeded.length > 0 ? seeded : defaults) as AdminRoleDefinition[]);
+    }
+    const store = readLocalStore();
+    if (!store.admin_roles || store.admin_roles.length === 0) {
+      store.admin_roles = defaultAdminRoles();
+      writeLocalStore(store);
+    }
+    return [...store.admin_roles];
+  },
+
+  async getAdminRoleById(id: string): Promise<AdminRoleDefinition | null> {
+    const roles = await this.listAdminRoles();
+    return roles.find((r) => r.id === id) || null;
+  },
+
+  async getAdminRoleBySlug(slug: string): Promise<AdminRoleDefinition | null> {
+    const clean = slug.trim().toLowerCase();
+    const roles = await this.listAdminRoles();
+    return roles.find((r) => r.slug.toLowerCase() === clean) || null;
+  },
+
+  async createAdminRole(input: {
+    slug: string;
+    name_ar: string;
+    description_ar?: string;
+    permissions_json: AdminPermission[];
+  }): Promise<AdminRoleDefinition> {
+    const now = new Date().toISOString();
+    const safePerms = Array.from(
+      new Set(
+        input.permissions_json.filter((p): p is AdminPermission =>
+          STAFF_ASSIGNABLE_PERMISSIONS.includes(p)
+        )
+      )
+    );
+    const record: AdminRoleDefinition = {
+      id: crypto.randomUUID(),
+      slug: input.slug.trim().toLowerCase(),
+      name_ar: input.name_ar.trim(),
+      description_ar: (input.description_ar || '').trim(),
+      permissions_json: safePerms,
+      is_system: false,
+      created_at: now,
+      updated_at: now,
+    };
+    if (isSupabaseConfigured()) {
+      const { data, error } = await getSupabaseAdmin()!
+        .from('admin_roles')
+        .insert(record)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return data as AdminRoleDefinition;
+    }
+    const store = readLocalStore();
+    if (!store.admin_roles || store.admin_roles.length === 0) {
+      store.admin_roles = defaultAdminRoles();
+    }
+    store.admin_roles.push(record);
+    writeLocalStore(store);
+    return record;
+  },
+
+  async updateAdminRole(
+    id: string,
+    patch: Partial<Pick<AdminRoleDefinition, 'name_ar' | 'description_ar' | 'permissions_json'>>
+  ): Promise<AdminRoleDefinition | null> {
+    const now = new Date().toISOString();
+    const safePerms = patch.permissions_json
+      ? Array.from(
+          new Set(
+            patch.permissions_json.filter((p): p is AdminPermission =>
+              STAFF_ASSIGNABLE_PERMISSIONS.includes(p)
+            )
+          )
+        )
+      : undefined;
+
+    if (isSupabaseConfigured()) {
+      const updatePayload: Record<string, unknown> = { updated_at: now };
+      if (patch.name_ar !== undefined) updatePayload.name_ar = patch.name_ar.trim();
+      if (patch.description_ar !== undefined) updatePayload.description_ar = patch.description_ar.trim();
+      if (safePerms !== undefined) updatePayload.permissions_json = safePerms;
+
+      const { data } = await getSupabaseAdmin()!
+        .from('admin_roles')
+        .update(updatePayload)
+        .eq('id', id)
+        .select()
+        .maybeSingle();
+      const updated = data as AdminRoleDefinition | null;
+      if (updated && safePerms !== undefined) {
+        await getSupabaseAdmin()!
+          .from('admin_staff')
+          .update({ permissions_json: safePerms, updated_at: now })
+          .eq('role', updated.slug);
+      }
+      return updated;
+    }
+
+    const store = readLocalStore();
+    if (!store.admin_roles || store.admin_roles.length === 0) {
+      store.admin_roles = defaultAdminRoles();
+    }
+    const idx = store.admin_roles.findIndex((r) => r.id === id);
+    if (idx === -1) return null;
+    const current = store.admin_roles[idx];
+    const updated: AdminRoleDefinition = {
+      ...current,
+      ...(patch.name_ar !== undefined ? { name_ar: patch.name_ar.trim() } : {}),
+      ...(patch.description_ar !== undefined ? { description_ar: patch.description_ar.trim() } : {}),
+      ...(safePerms !== undefined ? { permissions_json: safePerms } : {}),
+      updated_at: now,
+    };
+    store.admin_roles[idx] = updated;
+    if (safePerms !== undefined && store.admin_staff) {
+      store.admin_staff = store.admin_staff.map((s) =>
+        s.role === updated.slug ? { ...s, permissions_json: safePerms, updated_at: now } : s
+      );
+    }
+    writeLocalStore(store);
+    return updated;
+  },
+
+  async deleteAdminRole(id: string): Promise<void> {
+    if (isSupabaseConfigured()) {
+      await getSupabaseAdmin()!.from('admin_roles').delete().eq('id', id).eq('is_system', false);
+      return;
+    }
+    const store = readLocalStore();
+    store.admin_roles = (store.admin_roles || []).filter((r) => r.id !== id || r.is_system);
+    writeLocalStore(store);
   },
 
   // --- Isolated Staff Accounts & Admin Sessions ---

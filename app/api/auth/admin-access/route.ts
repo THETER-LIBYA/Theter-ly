@@ -13,7 +13,11 @@ import {
   verifyOrigin,
   verifyPassword,
 } from '@/lib/security';
-import { ALL_ADMIN_PERMISSIONS, STAFF_ASSIGNABLE_PERMISSIONS } from '@/lib/types';
+import {
+  ALL_ADMIN_PERMISSIONS,
+  STAFF_ASSIGNABLE_PERMISSIONS,
+  STAFF_ROLE_LABELS,
+} from '@/lib/types';
 
 export async function GET(req: NextRequest) {
   const admin = await isAdminAuthenticated(req);
@@ -26,6 +30,7 @@ export async function GET(req: NextRequest) {
     actorType: admin.actorType,
     actorName: admin.actorName,
     actorRole: admin.actorRole,
+    actorRoleLabel: admin.actorRoleLabel,
     permissions: admin.permissions,
     needsFirstRunClaim: !envConfigured && !claimedHash,
     envPasscodeActive: envConfigured,
@@ -111,6 +116,7 @@ export async function POST(req: NextRequest) {
         ip_address: ip,
       });
 
+      const roleDef = await db.getAdminRoleBySlug(staff.role);
       const res = NextResponse.json({
         ok: true,
         actor: {
@@ -118,6 +124,7 @@ export async function POST(req: NextRequest) {
           actorType: 'staff',
           actorName: staff.full_name,
           actorRole: staff.role,
+          actorRoleLabel: roleDef?.name_ar || STAFF_ROLE_LABELS[staff.role] || staff.role,
           permissions,
         },
       });
@@ -192,6 +199,7 @@ export async function POST(req: NextRequest) {
         actorType: 'super_admin',
         actorName: 'المدير العام',
         actorRole: 'super_admin',
+        actorRoleLabel: STAFF_ROLE_LABELS.super_admin,
         permissions: ALL_ADMIN_PERMISSIONS,
       },
     });

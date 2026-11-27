@@ -8,7 +8,13 @@ import {
   SESSION_COOKIE_NAME,
   USER_SESSION_TTL_SECONDS,
 } from './security';
-import { AdminPermission, ALL_ADMIN_PERMISSIONS, STAFF_ASSIGNABLE_PERMISSIONS, User } from './types';
+import {
+  AdminPermission,
+  ALL_ADMIN_PERMISSIONS,
+  STAFF_ASSIGNABLE_PERMISSIONS,
+  STAFF_ROLE_LABELS,
+  User,
+} from './types';
 
 export async function getSessionUser(req?: NextRequest): Promise<User | null> {
   let token: string | undefined;
@@ -63,6 +69,7 @@ export interface AdminAuthContext {
   actorType: 'super_admin' | 'staff' | null;
   actorName: string;
   actorRole: string;
+  actorRoleLabel: string;
   permissions: AdminPermission[];
 }
 
@@ -77,6 +84,7 @@ export async function isAdminAuthenticated(
     actorType: null,
     actorName: '',
     actorRole: 'guest',
+    actorRoleLabel: '',
     permissions: [],
   };
 
@@ -108,6 +116,7 @@ export async function isAdminAuthenticated(
       actorType: 'super_admin',
       actorName: session.actor_name || 'المدير العام',
       actorRole: 'super_admin',
+      actorRoleLabel: STAFF_ROLE_LABELS.super_admin,
       permissions,
     };
   }
@@ -117,6 +126,7 @@ export async function isAdminAuthenticated(
     if (!staff || !staff.is_active) {
       return guest;
     }
+    const roleDef = await db.getAdminRoleBySlug(staff.role);
     const permissions = (staff.permissions_json || []).filter((p): p is AdminPermission =>
       STAFF_ASSIGNABLE_PERMISSIONS.includes(p)
     );
@@ -128,6 +138,7 @@ export async function isAdminAuthenticated(
       actorType: 'staff',
       actorName: staff.full_name,
       actorRole: staff.role,
+      actorRoleLabel: roleDef?.name_ar || STAFF_ROLE_LABELS[staff.role] || staff.role,
       permissions,
     };
   }
