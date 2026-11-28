@@ -13,7 +13,7 @@ export default async function NotFound() {
         </div>
         <h1 className="mt-4 text-2xl font-extrabold text-white">الصفحة غير موجودة (404)</h1>
         <p className="mt-2 text-sm text-slate-300">
-          الرابط الذي تبحث عنه غير متاح أو تم نقله. يمكنك العودة إلى الصفحة الرئيسية لمنصة تيتر ليبيا.
+          الرابط الذي تبحث عنه غير متاح أو تم نقله. يمكنك العودة إلى الصفحة الرئيسية لمنصة ZarnixPay.
         </p>
         <Link
           href="/"

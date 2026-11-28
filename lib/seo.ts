@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
 import { db } from './db';
 
-export const OFFICIAL_SITE_URL = 'https://www.tether-ly.ly';
+export const OFFICIAL_SITE_URL = 'https://zarnixpay.ly';
 
 export function getOfficialSiteUrl(): string {
   const candidate = process.env.NEXT_PUBLIC_SITE_URL?.trim() || process.env.APP_URL?.trim();
-  if (candidate && /^https:\/\/(www\.)?tether-ly\.ly\/?$/i.test(candidate)) {
+  if (candidate && /^https:\/\/(www\.)?zarnixpay\.ly\/?$/i.test(candidate)) {
     return OFFICIAL_SITE_URL;
   }
   return OFFICIAL_SITE_URL;
@@ -17,11 +17,8 @@ export function toOfficialAbsoluteUrl(
 ): string {
   const baseUrl = getOfficialSiteUrl();
   const raw = (urlOrPath || '').trim() || fallbackPath;
-  if (/^https?:\/\/(www\.)?tetherlibya\.ly(\/|$)/i.test(raw)) {
-    return raw.replace(/^https?:\/\/(www\.)?tetherlibya\.ly/i, baseUrl);
-  }
-  if (/^https?:\/\/(www\.)?tether-ly\.ly(\/|$)/i.test(raw)) {
-    return raw.replace(/^https?:\/\/(www\.)?tether-ly\.ly/i, baseUrl);
+  if (/^https?:\/\/(www\.)?(zarnixpay|tetherlibya|tether-ly)\.ly(\/|$)/i.test(raw)) {
+    return raw.replace(/^https?:\/\/(www\.)?(zarnixpay|tetherlibya|tether-ly)\.ly/i, baseUrl);
   }
   if (/^https?:\/\//i.test(raw)) {
     return raw;
@@ -33,10 +30,14 @@ export async function buildPageMetadata(slug: string, options?: { noindex?: bool
   const baseUrl = getOfficialSiteUrl();
   const [seo, content] = await Promise.all([db.getSeoSetting(slug), db.getSiteContent()]);
 
-  const title = seo?.title || `${content.app_name_ar} | ${content.app_name_en}`;
+  const brandName =
+    content.app_name_ar && content.app_name_en && content.app_name_ar !== content.app_name_en
+      ? `${content.app_name_ar} | ${content.app_name_en}`
+      : content.app_name_ar || content.app_name_en || 'ZarnixPay';
+  const title = seo?.title || brandName;
   const description =
     seo?.description ||
-    `${content.tagline_ar} — منصة شراء وبيع USDT بالدينار الليبي مباشرة بأمان وسرعة.`;
+    `${content.tagline_ar} — منصة ZarnixPay لشراء وبيع USDT بالدينار الليبي مباشرة بأمان وسرعة.`;
   const canonicalPath = seo?.canonical_url || (slug === 'home' ? '/' : `/${slug}`);
   const canonical = toOfficialAbsoluteUrl(canonicalPath, slug === 'home' ? '/' : `/${slug}`);
   const absoluteOgImage = toOfficialAbsoluteUrl(seo?.og_image_url, '/og-image.png');
@@ -59,7 +60,7 @@ export async function buildPageMetadata(slug: string, options?: { noindex?: bool
     openGraph: {
       type: 'website',
       locale: 'ar_LY',
-      siteName: `${content.app_name_ar} | ${content.app_name_en}`,
+      siteName: brandName,
       title: seo?.og_title || title,
       description: seo?.og_description || description,
       url: canonical,

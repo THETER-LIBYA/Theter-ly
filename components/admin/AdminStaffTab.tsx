@@ -965,7 +965,7 @@ export function AdminStaffTab({
             <span>دليل الصلاحيات القياسية للمنصة ({totalPlatformPermissions} صلاحية)</span>
           </h3>
           <p className="text-xs text-slate-400">
-            تفاصيل كل صلاحية وتأثيرها على العمليات الحساسة داخل لوحة تحكم تيتر ليبيا
+            تفاصيل كل صلاحية وتأثيرها على العمليات الحساسة داخل لوحة تحكم ZarnixPay
           </p>
         </div>
 

@@ -18,11 +18,18 @@ export default async function HomePage() {
     getSessionUser(),
   ]);
 
+  const brandDisplayName =
+    siteContent.app_name_ar &&
+    siteContent.app_name_en &&
+    siteContent.app_name_ar !== siteContent.app_name_en
+      ? `${siteContent.app_name_ar} | ${siteContent.app_name_en}`
+      : siteContent.app_name_ar || siteContent.app_name_en || 'ZarnixPay';
+
   const schemaData = [
     {
       '@context': 'https://schema.org',
       '@type': 'Organization',
-      name: `${siteContent.app_name_ar} | ${siteContent.app_name_en}`,
+      name: brandDisplayName,
       url: baseUrl,
       logo: toOfficialAbsoluteUrl(siteContent.logo_url, '/images/brand-icon.png'),
       contactPoint: {
@@ -35,17 +42,17 @@ export default async function HomePage() {
     {
       '@context': 'https://schema.org',
       '@type': 'WebSite',
-      name: siteContent.app_name_ar,
+      name: siteContent.app_name_ar || 'ZarnixPay',
       url: baseUrl,
       inLanguage: 'ar',
     },
     {
       '@context': 'https://schema.org',
       '@type': 'SoftwareApplication',
-      name: `${siteContent.app_name_ar} | ${siteContent.app_name_en}`,
+      name: brandDisplayName,
       applicationCategory: 'FinanceApplication',
       operatingSystem: 'Android, iOS, Web',
-      description: 'منصة تيتر ليبيا لشراء وبيع USDT بالدينار الليبي مباشرة عبر LYPay وOnePay وشبكة TRON.',
+      description: 'منصة ZarnixPay لشراء وبيع USDT بالدينار الليبي مباشرة عبر LYPay وOnePay وشبكة TRON.',
     },
   ];
 

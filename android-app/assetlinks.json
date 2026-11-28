@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "ly.tetherly.app",
+      "sha256_cert_fingerprints": [
+        "BF:9B:E8:68:7E:F9:1B:63:8E:31:8A:31:5C:B2:59:24:F5:C3:EE:FF:E3:C7:8A:FB:BC:F6:34:13:E7:6F:2D:47"
+      ]
+    }
+  }
+]

@@ -81,8 +81,8 @@ export function AppShell({
     subscribeToPush,
   } = usePWA({ userId: user?.id });
 
-  const appNameAr = siteContent?.app_name_ar || 'تيتر ليبيا';
-  const appNameEn = siteContent?.app_name_en || 'Tether Libya';
+  const appNameAr = siteContent?.app_name_ar || 'ZarnixPay';
+  const appNameEn = siteContent?.app_name_en || 'ZarnixPay';
   const taglineAr = siteContent?.tagline_ar || 'آمن .. سريع .. بكل ثقة';
   const logoUrl = siteContent?.logo_url || '/images/brand-icon.png';
   const isLockedGate = Boolean(
@@ -311,7 +311,7 @@ export function AppShell({
                   {appNameAr}
                 </div>
                 <div className="text-[11px] font-medium tracking-wide text-slate-300 font-[family-name:var(--font-latin)] leading-tight">
-                  {appNameEn}
+                  {appNameEn && appNameEn !== appNameAr ? appNameEn : 'zarnixpay.ly'}
                 </div>
               </div>
               <div className="relative w-11 h-11 rounded-full p-0.5 bg-gradient-to-tr from-[#10F5A6] via-[#2DD4BF] to-[#0D8BFF] shadow-[0_0_20px_rgba(16,245,166,0.38)] shrink-0">
@@ -331,7 +331,7 @@ export function AppShell({
                   {appNameAr}
                 </div>
                 <div className="text-[11px] font-medium tracking-wide text-slate-300 font-[family-name:var(--font-latin)] leading-tight">
-                  {appNameEn}
+                  {appNameEn && appNameEn !== appNameAr ? appNameEn : 'zarnixpay.ly'}
                 </div>
               </div>
               <div className="relative w-11 h-11 rounded-full p-0.5 bg-gradient-to-tr from-[#10F5A6] via-[#2DD4BF] to-[#0D8BFF] shadow-[0_0_20px_rgba(16,245,166,0.38)] shrink-0">

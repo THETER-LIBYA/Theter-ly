@@ -35,7 +35,7 @@ function validateVapidKeyPair(
     if (pubBuf.length !== 65 || pubBuf[0] !== 0x04 || privBuf.length !== 32) {
       return null;
     }
-    webpush.setVapidDetails('mailto:support@tetherlibya.ly', publicKey, privateKey);
+    webpush.setVapidDetails('mailto:support@zarnixpay.ly', publicKey, privateKey);
     return { publicKey, privateKey };
   } catch {
     return null;
@@ -104,7 +104,7 @@ async function deliverPushToUser(
     getVapidKeys(),
     db.getSiteContent().catch(() => null),
   ]);
-  const subject = process.env.VAPID_SUBJECT?.trim() || 'mailto:support@tetherlibya.ly';
+  const subject = process.env.VAPID_SUBJECT?.trim() || 'mailto:support@zarnixpay.ly';
   webpush.setVapidDetails(subject, keys.publicKey, keys.privateKey);
 
   const iconUrl = siteContent?.icon_192_url || '/pwa-192x192.png';

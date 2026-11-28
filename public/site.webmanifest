@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "تيتر ليبيا | Tether Libya",
-  "short_name": "تيتر ليبيا",
-  "description": "آمن .. سريع .. بكل ثقة — منصة شراء وبيع USDT بالدينار الليبي مباشرة عبر LYPay وOnePay وشبكة TRON.",
+  "name": "ZarnixPay",
+  "short_name": "ZarnixPay",
+  "description": "آمن .. سريع .. بكل ثقة — منصة ZarnixPay لشراء وبيع USDT بالدينار الليبي مباشرة عبر LYPay وOnePay وشبكة TRON.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

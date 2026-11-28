@@ -1,0 +1,20 @@
+# Signing keys & secrets - MUST NEVER be committed to GitHub
+*.jks
+*.keystore
+*.p12
+signing/
+keystore/
+keystore.properties
+
+# Gradle & Android build intermediates
+.gradle/
+build/
+app/build/
+captures/
+local.properties
+.cxx/
+
+# IDE files
+.idea/
+*.iml
+.DS_Store

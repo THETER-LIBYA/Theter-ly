@@ -1,5 +1,5 @@
-const SW_VERSION = 'tl-sw-v1.3.0';
-const STATIC_CACHE = `tether-libya-static-${SW_VERSION}`;
+const SW_VERSION = 'zp-sw-v2.0.0';
+const STATIC_CACHE = `zarnixpay-static-${SW_VERSION}`;
 const STATIC_ASSETS = [
   '/offline',
   '/icon.svg',
@@ -24,7 +24,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) =>
       Promise.all(
         keys
-          .filter((key) => key.startsWith('tether-libya-') && key !== STATIC_CACHE)
+          .filter((key) => (key.startsWith('zarnixpay-') || key.startsWith('tether-libya-')) && key !== STATIC_CACHE)
           .map((key) => caches.delete(key))
       )
     ).then(() => self.clients.claim())
@@ -103,12 +103,12 @@ async function resolveSafeIconUrl(candidate) {
 // Web Push Notifications Handler (System-level heads-up / lock-screen alerts + open window sync)
 self.addEventListener('push', (event) => {
   let data = {
-    title: 'تيتر ليبيا | Tether Libya',
+    title: 'ZarnixPay',
     body: 'لديك تحديث جديد في حسابك',
     url: '/notifications',
     icon: '/pwa-192x192.png',
     badge: '/pwa-192x192.png',
-    tag: `tl-notif-${Date.now()}`,
+    tag: `zp-notif-${Date.now()}`,
   };
 
   if (event.data) {

@@ -1,0 +1,50 @@
+{
+  "packageId": "ly.tetherly.app",
+  "host": "www.tether-ly.ly",
+  "name": "تيتر ليبيا | Tether Libya",
+  "launcherName": "تيتر ليبيا",
+  "display": "standalone",
+  "themeColor": "#050B18",
+  "themeColorDark": "#050B18",
+  "navigationColor": "#050B18",
+  "navigationColorDark": "#050B18",
+  "navigationDividerColor": "#050B18",
+  "navigationDividerColorDark": "#050B18",
+  "backgroundColor": "#050B18",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://www.tether-ly.ly/api/files/branding/pwa/1795716601403-pwa-512.png",
+  "maskableIconUrl": "https://www.tether-ly.ly/api/files/branding/pwa/1795716601403-pwa-maskable-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./signing/tether-ly-release.jks",
+    "alias": "tetherly"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://www.tether-ly.ly/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://www.tether-ly.ly/",
+  "minSdkVersion": 21,
+  "orientation": "portrait",
+  "fingerprints": [
+    {
+      "name": "release",
+      "value": "BF:9B:E8:68:7E:F9:1B:63:8E:31:8A:31:5C:B2:59:24:F5:C3:EE:FF:E3:C7:8A:FB:BC:F6:34:13:E7:6F:2D:47"
+    }
+  ],
+  "additionalTrustedOrigins": [
+    "tether-ly.ly"
+  ],
+  "retainedBundles": [],
+  "appVersion": "1.0.0"
+}

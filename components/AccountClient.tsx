@@ -496,7 +496,7 @@ export function AccountClient({
             className="w-full py-3 px-4 rounded-xl bg-emerald-500/15 border border-[#10F5A6]/35 text-sm font-bold text-[#10F5A6] flex items-center justify-center gap-2"
           >
             <Download className="w-4 h-4" />
-            <span>تثبيت تطبيق تيتر ليبيا</span>
+            <span>تثبيت تطبيق ZarnixPay</span>
           </button>
         )}
 

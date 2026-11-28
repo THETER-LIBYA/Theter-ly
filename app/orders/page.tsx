@@ -9,7 +9,7 @@ import { formatTripoliDateParts } from '@/lib/format';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'سجل العمليات — تيتر ليبيا',
+  title: 'سجل العمليات — ZarnixPay',
   robots: { index: false, follow: false },
 };
 

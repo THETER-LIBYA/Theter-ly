@@ -73,7 +73,7 @@ export function AdminAuthGate({
         <div className="flex items-center justify-between">
           <span className="text-xs text-[#10F5A6] font-bold">بوابة الإدارة المستقلة</span>
           <span className="text-xs text-slate-400 font-semibold font-[family-name:var(--font-latin)]">
-            Tether Libya Control
+            ZarnixPay Control
           </span>
         </div>
 

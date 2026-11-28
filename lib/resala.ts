@@ -30,7 +30,7 @@ export interface ResalaPinResponse {
 
 export async function sendResalaPin(phone: string): Promise<ResalaPinResponse> {
   const token = process.env.RESALA_API_TOKEN?.trim();
-  const serviceName = process.env.RESALA_SERVICE_NAME?.trim() || 'Tether Libya';
+  const serviceName = process.env.RESALA_SERVICE_NAME?.trim() || 'ZarnixPay';
   const sender = process.env.RESALA_SENDER_ID?.trim();
   const isTestMode = process.env.RESALA_TEST_MODE === 'true';
 

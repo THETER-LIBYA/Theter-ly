@@ -7,7 +7,7 @@ import { db } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'مركز الإشعارات — تيتر ليبيا',
+  title: 'مركز الإشعارات — ZarnixPay',
   robots: { index: false, follow: false },
 };
 

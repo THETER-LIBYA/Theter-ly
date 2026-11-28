@@ -98,7 +98,7 @@ export async function PATCH(req: NextRequest) {
             userId: u.id,
             templateKey: 'rate_updated',
             type: 'rate_alerts',
-            fallbackTitle: 'تحديث أسعار USDT في تيتر ليبيا',
+            fallbackTitle: 'تحديث أسعار USDT في ZarnixPay',
             fallbackBody: `سعر الشراء: ${updated.buy_rate} د.ل | سعر البيع: ${updated.sell_rate} د.ل`,
             vars: {
               buy_rate: updated.buy_rate.toFixed(3),

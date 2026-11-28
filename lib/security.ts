@@ -1,16 +1,16 @@
 import crypto from 'crypto';
 import { NextRequest } from 'next/server';
 
-const globalForSecret = globalThis as unknown as { __tetherSessionSecret?: string };
+const globalForSecret = globalThis as unknown as { __zarnixSessionSecret?: string };
 
 export function getSessionSecret(): string {
   if (process.env.SESSION_SECRET && process.env.SESSION_SECRET.length >= 16) {
     return process.env.SESSION_SECRET;
   }
-  if (!globalForSecret.__tetherSessionSecret) {
-    globalForSecret.__tetherSessionSecret = crypto.randomBytes(32).toString('hex');
+  if (!globalForSecret.__zarnixSessionSecret) {
+    globalForSecret.__zarnixSessionSecret = crypto.randomBytes(32).toString('hex');
   }
-  return globalForSecret.__tetherSessionSecret;
+  return globalForSecret.__zarnixSessionSecret;
 }
 
 export function hashToken(token: string): string {

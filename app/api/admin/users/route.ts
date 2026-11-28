@@ -101,7 +101,7 @@ export async function PATCH(req: NextRequest) {
       userId: updated.id,
       type: 'order_updates',
       fallbackTitle: 'تم توثيق حسابك بنجاح',
-      fallbackBody: 'مبروك! تم اعتماد مستنداتك وتوثيق حسابك في تيتر ليبيا ويمكنك الآن التداول بكامل المزايا.',
+      fallbackBody: 'مبروك! تم اعتماد مستنداتك وتوثيق حسابك في ZarnixPay ويمكنك الآن التداول بكامل المزايا.',
       actionUrl: '/account',
     });
   } else if (body.kyc_status === 'needs_reverification') {

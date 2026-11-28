@@ -84,11 +84,11 @@ export async function POST(req: NextRequest) {
     let user = await db.getUserByPhone(phone);
     if (!user) {
       user = await db.upsertUserByPhone(phone, {
-        full_name: body.fullName?.trim() || 'عميل تيتر ليبيا',
+        full_name: body.fullName?.trim() || 'عميل ZarnixPay',
         kyc_status: 'unverified',
         onboarding_completed: false,
       });
-    } else if (body.fullName?.trim() && user.full_name === 'عميل تيتر ليبيا') {
+    } else if (body.fullName?.trim() && (user.full_name === 'عميل ZarnixPay' || user.full_name === 'عميل تيتر ليبيا')) {
       user = (await db.updateUser(user.id, { full_name: body.fullName.trim() })) || user;
     }
 

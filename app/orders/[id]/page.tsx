@@ -9,7 +9,7 @@ import { db } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'تفاصيل الطلب — تيتر ليبيا',
+  title: 'تفاصيل الطلب — ZarnixPay',
   robots: { index: false, follow: false },
 };
 

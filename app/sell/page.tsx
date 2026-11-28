@@ -8,7 +8,7 @@ import { getOrRefreshRates } from '@/lib/prices';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'بيع USDT مباشر — تيتر ليبيا',
+  title: 'بيع USDT مباشر — ZarnixPay',
   robots: { index: false, follow: false },
 };
 

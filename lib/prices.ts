@@ -24,7 +24,7 @@ export async function fetchLivePricesLyUsdRate(): Promise<{
     try {
       const res = await fetch(url, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; TetherLibya/1.0)',
+          'User-Agent': 'Mozilla/5.0 (compatible; ZarnixPay/1.0)',
           Accept: 'application/json',
           Origin: 'https://prices.ly',
           Referer: 'https://prices.ly/',

@@ -361,7 +361,7 @@ export function AdminDashboard() {
                 <ShieldCheck className="w-5 h-5" />
               </div>
               <div className="min-w-0">
-                <div className="text-sm font-extrabold text-white truncate">تيتر ليبيا</div>
+                <div className="text-sm font-extrabold text-white truncate">ZarnixPay</div>
                 <div className="text-[10px] text-slate-400 font-[family-name:var(--font-latin)] truncate">
                   Control Center
                 </div>

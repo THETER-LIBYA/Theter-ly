@@ -17,8 +17,8 @@ import { getOrRefreshRates } from '@/lib/prices';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'إحصائيات حسابي والأسعار — تيتر ليبيا',
-  description: 'ملخص تعاملاتك الشخصية وأسعار شراء وبيع USDT المباشرة في منصة تيتر ليبيا.',
+  title: 'إحصائيات حسابي والأسعار — ZarnixPay',
+  description: 'ملخص تعاملاتك الشخصية وأسعار شراء وبيع USDT المباشرة في منصة ZarnixPay.',
 };
 
 export default async function StatsPage() {

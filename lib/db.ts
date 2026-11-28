@@ -86,15 +86,38 @@ interface LocalStore {
 }
 
 const DATA_DIR = getWritableDataDir();
-const DATA_FILE = path.join(DATA_DIR, 'tether-libya-db.json');
+const DATA_FILE = path.join(DATA_DIR, 'zarnixpay-db.json');
+
+function sanitizeBrandText(text: string): string {
+  if (!text) return text;
+  return text
+    .replace(/تيتر\s+ليبيا\s*\(Tether\s+Libya\)/gi, 'ZarnixPay')
+    .replace(/تيتر\s+ليبيا\s*\|\s*Tether\s+Libya/gi, 'ZarnixPay')
+    .replace(/Tether\s*Libya/gi, 'ZarnixPay')
+    .replace(/تيتر\s+ليبيا/g, 'ZarnixPay')
+    .replace(/للتيتر/g, 'لـ USDT')
+    .replace(/التيتر/g, 'USDT')
+    .replace(/https?:\/\/(www\.)?(tetherlibya|tether-ly)\.ly/gi, 'https://zarnixpay.ly')
+    .replace(/tetherlibya\.ly/gi, 'zarnixpay.ly')
+    .replace(/tether-ly\.ly/gi, 'zarnixpay.ly')
+    .replace(/tetherlibya/gi, 'zarnixpay');
+}
+
+function sanitizeBrandAssetUrl(url: string | null | undefined, fallback: string): string {
+  const clean = (url || '').trim();
+  if (!clean || /1795716601403-|tether/i.test(clean)) {
+    return fallback;
+  }
+  return clean;
+}
 
 const DEFAULT_PUBLIC_PAGES = {
   about: {
     slug: 'about',
     title_ar: 'من نحن',
-    subtitle_ar: 'تيتر ليبيا — بوابة التداول المباشر للتيتر في ليبيا',
+    subtitle_ar: 'ZarnixPay — بوابة التداول المباشر لـ USDT في ليبيا',
     body_ar:
-      'تيتر ليبيا (Tether Libya) منصة مالية متخصصة في تسهيل عمليات شراء وبيع USDT بالدينار الليبي بشكل مباشر وآمن، دون الحاجة لمحفظة داخلية، مع مراجعة يدوية دقيقة لكل معاملة وشفافية كاملة في التسعير المحدث لحظياً ووسائل الدفع المحلية المعتمدة.',
+      'ZarnixPay منصة مالية متخصصة في تسهيل عمليات شراء وبيع USDT بالدينار الليبي بشكل مباشر وآمن، دون الحاجة لمحفظة داخلية، مع مراجعة يدوية دقيقة لكل معاملة وشفافية كاملة في التسعير المحدث لحظياً ووسائل الدفع المحلية المعتمدة.',
     is_visible: true,
   },
   'how-it-works': {
@@ -126,7 +149,7 @@ const DEFAULT_PUBLIC_PAGES = {
     title_ar: 'الشروط والأحكام',
     subtitle_ar: 'الضوابط القانونية والتشغيلية وسياسة مكافحة غسل الأموال',
     body_ar:
-      'باستخدامك لمنصة تيتر ليبيا فإنك تقر بموافقتك الكاملة على ضوابط الامتثال ومكافحة غسل الأموال، وتتحمل المسؤولية القانونية الكاملة عن مصدر الأموال والغرض من استخدامها مع إخلاء مسؤولية المنصة التام عن أي تصرف غير مشروع، كما تخضع كافة التحويلات للرقابة والتدقيق.',
+      'باستخدامك لمنصة ZarnixPay فإنك تقر بموافقتك الكاملة على ضوابط الامتثال ومكافحة غسل الأموال، وتتحمل المسؤولية القانونية الكاملة عن مصدر الأموال والغرض من استخدامها مع إخلاء مسؤولية المنصة التام عن أي تصرف غير مشروع، كما تخضع كافة التحويلات للرقابة والتدقيق.',
     is_visible: true,
   },
   privacy: {
@@ -148,7 +171,7 @@ const DEFAULT_PUBLIC_PAGES = {
   security: {
     slug: 'security',
     title_ar: 'الأمان والموثوقية',
-    subtitle_ar: 'معايير الحماية والتدقيق الصارم في تيتر ليبيا',
+    subtitle_ar: 'معايير الحماية والتدقيق الصارم في ZarnixPay',
     body_ar:
       'نطبق تحققاً مزدوجاً لرقم الهاتف عبر رمز التحقق الهاتفي، وتوثيق الهوية بالوثائق الرسمية، ومنع تكرار أرقام الحوالات ومعرّفات البلوكشين (TX Hash)، مع سجل تدقيق غير قابل للتعديل ومراجعة بشرية مزدوجة قبل اعتماد أي تحويل صادر.',
     is_visible: true,
@@ -174,23 +197,23 @@ function buildDefaultSeo(): SeoSetting[] {
   }> = [
     {
       slug: 'home',
-      title: 'تيتر ليبيا | Tether Libya — شراء وبيع USDT بالدينار الليبي',
+      title: 'ZarnixPay — شراء وبيع USDT بالدينار الليبي',
       description:
-        'منصة تيتر ليبيا لشراء وبيع USDT مباشرة عبر LYPay وOnePay وشبكة TRON بأسعار محدثة وأمان وموثوقية عالية.',
-      keywords: 'تيتر ليبيا, Tether Libya, شراء USDT ليبيا, بيع USDT ليبيا, LYPay, OnePay, سعر الدولار ليبيا',
+        'منصة ZarnixPay لشراء وبيع USDT مباشرة عبر LYPay وOnePay وشبكة TRON بأسعار محدثة وأمان وموثوقية عالية.',
+      keywords: 'ZarnixPay, zarnixpay.ly, شراء USDT ليبيا, بيع USDT ليبيا, LYPay, OnePay, سعر الدولار ليبيا',
       schema_type: 'WebSite',
     },
     {
       slug: 'about',
-      title: 'من نحن — تيتر ليبيا | Tether Libya',
+      title: 'من نحن — ZarnixPay',
       description:
-        'تعرف على منصة تيتر ليبيا وآلية العمل المباشر لشراء وبيع التيتر USDT في ليبيا بأمان وشفافية.',
-      keywords: 'من نحن, تيتر ليبيا, تداول USDT ليبيا',
+        'تعرف على منصة ZarnixPay وآلية العمل المباشر لشراء وبيع USDT في ليبيا بأمان وشفافية.',
+      keywords: 'من نحن, ZarnixPay, تداول USDT ليبيا',
       schema_type: 'Organization',
     },
     {
       slug: 'how-it-works',
-      title: 'آلية الشراء والبيع — تيتر ليبيا',
+      title: 'آلية الشراء والبيع — ZarnixPay',
       description:
         'دليل عملي لخطوات شراء وبيع USDT عبر LYPay وOnePay وشبكة TRON TRC20 مع المراجعة اليدوية.',
       keywords: 'كيف تشتري USDT في ليبيا, بيع USDT دينار ليبي, شبكة TRON TRC20',
@@ -198,52 +221,52 @@ function buildDefaultSeo(): SeoSetting[] {
     },
     {
       slug: 'faq',
-      title: 'الأسئلة الشائعة — تيتر ليبيا',
+      title: 'الأسئلة الشائعة — ZarnixPay',
       description:
         'أكثر الأسئلة شيوعاً حول أسعار الصرف، أوقات المراجعة، وسائل الدفع LYPay وOnePay، وتوثيق الحساب.',
-      keywords: 'أسئلة شائعة تيتر ليبيا, دعم تيتر ليبيا',
+      keywords: 'أسئلة شائعة ZarnixPay, دعم ZarnixPay',
       schema_type: 'FAQPage',
     },
     {
       slug: 'contact',
-      title: 'اتصل بنا والدعم الفني — تيتر ليبيا',
-      description: 'تواصل مع فريق الدعم الفني في تيتر ليبيا لمتابعة طلبات الشراء والبيع.',
-      keywords: 'اتصل بنا تيتر ليبيا, الدعم الفني USDT ليبيا',
+      title: 'اتصل بنا والدعم الفني — ZarnixPay',
+      description: 'تواصل مع فريق الدعم الفني في ZarnixPay لمتابعة طلبات الشراء والبيع.',
+      keywords: 'اتصل بنا ZarnixPay, الدعم الفني USDT ليبيا',
       schema_type: 'WebPage',
     },
     {
       slug: 'terms',
-      title: 'الشروط والأحكام — تيتر ليبيا',
-      description: 'الشروط والأحكام المنظمة لاستخدام منصة تيتر ليبيا وسياسة مكافحة غسل الأموال.',
-      keywords: 'الشروط والأحكام تيتر ليبيا',
+      title: 'الشروط والأحكام — ZarnixPay',
+      description: 'الشروط والأحكام المنظمة لاستخدام منصة ZarnixPay وسياسة مكافحة غسل الأموال.',
+      keywords: 'الشروط والأحكام ZarnixPay',
       schema_type: 'WebPage',
     },
     {
       slug: 'privacy',
-      title: 'سياسة الخصوصية — تيتر ليبيا',
-      description: 'سياسة الخصوصية وحماية البيانات الشخصية والمصرفية ومستندات التوثيق في تيتر ليبيا.',
-      keywords: 'سياسة الخصوصية تيتر ليبيا',
+      title: 'سياسة الخصوصية — ZarnixPay',
+      description: 'سياسة الخصوصية وحماية البيانات الشخصية والمصرفية ومستندات التوثيق في ZarnixPay.',
+      keywords: 'سياسة الخصوصية ZarnixPay',
       schema_type: 'WebPage',
     },
     {
       slug: 'risk-disclosure',
-      title: 'الإفصاحات والمخاطر — تيتر ليبيا',
-      description: 'تنبيهات المخاطر المالية وإرشادات التحويل عبر شبكة TRON TRC20 في تيتر ليبيا.',
+      title: 'الإفصاحات والمخاطر — ZarnixPay',
+      description: 'تنبيهات المخاطر المالية وإرشادات التحويل عبر شبكة TRON TRC20 في ZarnixPay.',
       keywords: 'الإفصاحات والمخاطر, أمان التحويل TRC20',
       schema_type: 'WebPage',
     },
     {
       slug: 'security',
-      title: 'الأمان والموثوقية — تيتر ليبيا',
-      description: 'إجراءات الأمان والتحقق اليدوي وتوثيق الهوية وحماية المعاملات في منصة تيتر ليبيا.',
-      keywords: 'أمان تيتر ليبيا, موثوقية تداول USDT',
+      title: 'الأمان والموثوقية — ZarnixPay',
+      description: 'إجراءات الأمان والتحقق اليدوي وتوثيق الهوية وحماية المعاملات في منصة ZarnixPay.',
+      keywords: 'أمان ZarnixPay, موثوقية تداول USDT',
       schema_type: 'WebPage',
     },
     {
       slug: 'rewards',
-      title: 'المكافآت والعروض — تيتر ليبيا',
-      description: 'تعرف على العروض والمزايا الحصرية لعملاء منصة تيتر ليبيا الموثقين.',
-      keywords: 'عروض تيتر ليبيا, مكافآت USDT',
+      title: 'المكافآت والعروض — ZarnixPay',
+      description: 'تعرف على العروض والمزايا الحصرية لعملاء منصة ZarnixPay الموثقين.',
+      keywords: 'عروض ZarnixPay, مكافآت USDT',
       schema_type: 'WebPage',
     },
   ];
@@ -340,7 +363,7 @@ function buildDefaultTemplates(): NotificationTemplate[] {
       id: crypto.randomUUID(),
       key: 'rate_updated',
       name_ar: 'تنبيه تحديث الأسعار',
-      title_template: 'تحديث أسعار USDT في تيتر ليبيا',
+      title_template: 'تحديث أسعار USDT في ZarnixPay',
       body_template: 'سعر الشراء الحالي {buy_rate} د.ل وسعر البيع {sell_rate} د.ل.',
       is_enabled: true,
       channel_push: true,
@@ -392,7 +415,7 @@ function createInitialStore(): LocalStore {
         id: crypto.randomUUID(),
         method: 'lypay',
         bank_name: 'خدمة LYPay - مصرف الجمهورية / التجاري',
-        account_holder: 'شركة تيتر ليبيا للخدمات المالية',
+        account_holder: 'شركة ZarnixPay للخدمات المالية',
         account_number: '001102003004005',
         iban: 'LY89002001102003004005001',
         phone_or_id: '218910000100',
@@ -406,7 +429,7 @@ function createInitialStore(): LocalStore {
         id: crypto.randomUUID(),
         method: 'onepay',
         bank_name: 'خدمة OnePay - مصرف التجارة والتنمية / الأمان',
-        account_holder: 'شركة تيتر ليبيا للخدمات المالية',
+        account_holder: 'شركة ZarnixPay للخدمات المالية',
         account_number: '22004400660088',
         iban: 'LY44010022004400660088002',
         phone_or_id: '218920000200',
@@ -439,23 +462,23 @@ function createInitialStore(): LocalStore {
     site_content: {
       id: 'default',
       logo_url: '/images/brand-icon.png',
-      app_name_ar: 'تيتر ليبيا',
-      app_name_en: 'Tether Libya',
+      app_name_ar: 'ZarnixPay',
+      app_name_en: 'ZarnixPay',
       tagline_ar: 'آمن .. سريع .. بكل ثقة',
       icon_192_url: '/pwa-192x192.png',
       icon_512_url: '/pwa-512x512.png',
       icon_maskable_url: '/pwa-maskable-512x512.png',
       apple_touch_icon_url: '/apple-touch-icon.png',
-      promo_banner_title: 'تيتر ليبيا ..',
+      promo_banner_title: 'ZarnixPay ..',
       promo_banner_subtitle: 'اختيارك الأفضل',
       promo_banner_image_url: '/images/promo-banner.jpg',
       primary_color: '#10F5A6',
       accent_color: '#0D8BFF',
       support_phone: '+218 91 000 0000',
       support_whatsapp: 'https://wa.me/218910000000',
-      support_email: 'support@tetherlibya.ly',
-      telegram_url: 'https://t.me/tetherlibya',
-      facebook_url: 'https://facebook.com/tetherlibya',
+      support_email: 'support@zarnixpay.ly',
+      telegram_url: 'https://t.me/zarnixpay',
+      facebook_url: 'https://facebook.com/zarnixpay',
       maintenance_mode: false,
       maintenance_message: 'المنصة تحت الصيانة المجدولة حالياً، سنعود قريباً.',
       public_pages_json: DEFAULT_PUBLIC_PAGES,
@@ -649,7 +672,7 @@ export const db = {
     const newUser: User = {
       id: crypto.randomUUID(),
       phone,
-      full_name: defaults?.full_name || 'عميل تيتر ليبيا',
+      full_name: defaults?.full_name || 'عميل ZarnixPay',
       first_name: defaults?.first_name || null,
       last_name: defaults?.last_name || null,
       city_area: defaults?.city_area || null,
@@ -930,18 +953,23 @@ export const db = {
 
   // --- Payment Accounts ---
   async listPaymentAccounts(activeOnly = false): Promise<PaymentAccount[]> {
+    const sanitizeAccount = (acc: PaymentAccount): PaymentAccount => ({
+      ...acc,
+      account_holder: sanitizeBrandText(acc.account_holder),
+      instructions: acc.instructions ? sanitizeBrandText(acc.instructions) : acc.instructions,
+    });
     if (isSupabaseConfigured()) {
       let query = getSupabaseAdmin()!.from('payment_accounts').select('*').order('display_order', { ascending: true });
       if (activeOnly) query = query.eq('is_active', true);
       const { data } = await query;
-      if (data && data.length > 0) return data as PaymentAccount[];
+      if (data && data.length > 0) return (data as PaymentAccount[]).map(sanitizeAccount);
       if (!activeOnly) return [];
       const defaults = createInitialStore().payment_accounts;
       await getSupabaseAdmin()!.from('payment_accounts').upsert(defaults);
-      return defaults;
+      return defaults.map(sanitizeAccount);
     }
     const all = [...readLocalStore().payment_accounts].sort((a, b) => a.display_order - b.display_order);
-    return activeOnly ? all.filter((a) => a.is_active) : all;
+    return (activeOnly ? all.filter((a) => a.is_active) : all).map(sanitizeAccount);
   },
 
   async savePaymentAccount(account: Partial<PaymentAccount> & { method: PaymentAccount['method']; bank_name: string; account_holder: string; account_number: string }): Promise<PaymentAccount> {
@@ -1336,14 +1364,19 @@ export const db = {
   },
 
   async listNotificationTemplates(): Promise<NotificationTemplate[]> {
+    const sanitizeTpl = (t: NotificationTemplate): NotificationTemplate => ({
+      ...t,
+      title_template: sanitizeBrandText(t.title_template),
+      body_template: sanitizeBrandText(t.body_template),
+    });
     if (isSupabaseConfigured()) {
       const { data } = await getSupabaseAdmin()!.from('notification_templates').select('*').order('key', { ascending: true });
-      if (data && data.length > 0) return data as NotificationTemplate[];
+      if (data && data.length > 0) return (data as NotificationTemplate[]).map(sanitizeTpl);
       const defaults = buildDefaultTemplates();
       await getSupabaseAdmin()!.from('notification_templates').upsert(defaults);
       return defaults;
     }
-    return readLocalStore().notification_templates;
+    return readLocalStore().notification_templates.map(sanitizeTpl);
   },
 
   async updateNotificationTemplate(
@@ -1470,10 +1503,32 @@ export const db = {
   async getSiteContent(): Promise<SiteContent> {
     const sanitizeContent = (sc: SiteContent): SiteContent => {
       const cleanPages = Object.fromEntries(
-        Object.entries(sc.public_pages_json || {}).filter(([k]) => !k.startsWith('__'))
+        Object.entries(sc.public_pages_json || {})
+          .filter(([k]) => !k.startsWith('__'))
+          .map(([k, page]) => [
+            k,
+            {
+              ...page,
+              title_ar: sanitizeBrandText(page.title_ar),
+              subtitle_ar: sanitizeBrandText(page.subtitle_ar),
+              body_ar: sanitizeBrandText(page.body_ar),
+            },
+          ])
       );
       return {
         ...sc,
+        logo_url: sanitizeBrandAssetUrl(sc.logo_url, '/images/brand-icon.png'),
+        app_name_ar: sanitizeBrandText(sc.app_name_ar) || 'ZarnixPay',
+        app_name_en: sanitizeBrandText(sc.app_name_en) || 'ZarnixPay',
+        icon_192_url: sanitizeBrandAssetUrl(sc.icon_192_url, '/pwa-192x192.png'),
+        icon_512_url: sanitizeBrandAssetUrl(sc.icon_512_url, '/pwa-512x512.png'),
+        icon_maskable_url: sanitizeBrandAssetUrl(sc.icon_maskable_url, '/pwa-maskable-512x512.png'),
+        apple_touch_icon_url: sanitizeBrandAssetUrl(sc.apple_touch_icon_url, '/apple-touch-icon.png'),
+        promo_banner_title: sanitizeBrandText(sc.promo_banner_title),
+        promo_banner_image_url: sanitizeBrandAssetUrl(sc.promo_banner_image_url, '/images/promo-banner.jpg'),
+        support_email: sanitizeBrandText(sc.support_email),
+        telegram_url: sanitizeBrandText(sc.telegram_url),
+        facebook_url: sanitizeBrandText(sc.facebook_url),
         public_pages_json: {
           ...DEFAULT_PUBLIC_PAGES,
           ...cleanPages,
@@ -1549,14 +1604,24 @@ export const db = {
 
   // --- SEO Settings ---
   async listSeoSettings(): Promise<SeoSetting[]> {
+    const sanitizeSeo = (s: SeoSetting): SeoSetting => ({
+      ...s,
+      title: sanitizeBrandText(s.title),
+      description: sanitizeBrandText(s.description),
+      keywords: sanitizeBrandText(s.keywords),
+      canonical_url: sanitizeBrandText(s.canonical_url),
+      og_title: sanitizeBrandText(s.og_title),
+      og_description: sanitizeBrandText(s.og_description),
+      og_image_url: sanitizeBrandAssetUrl(s.og_image_url, '/og-image.png'),
+    });
     if (isSupabaseConfigured()) {
       const { data } = await getSupabaseAdmin()!.from('seo_settings').select('*').order('page_slug', { ascending: true });
-      if (data && data.length > 0) return data as SeoSetting[];
+      if (data && data.length > 0) return (data as SeoSetting[]).map(sanitizeSeo);
       const defaults = buildDefaultSeo();
       await getSupabaseAdmin()!.from('seo_settings').upsert(defaults);
-      return defaults;
+      return defaults.map(sanitizeSeo);
     }
-    return readLocalStore().seo_settings;
+    return readLocalStore().seo_settings.map(sanitizeSeo);
   },
 
   async getSeoSetting(slug: string): Promise<SeoSetting | null> {

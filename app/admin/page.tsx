@@ -4,7 +4,7 @@ import { AdminDashboard } from '@/components/admin/AdminDashboard';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'لوحة التحكم المركزية — تيتر ليبيا',
+  title: 'لوحة التحكم المركزية — ZarnixPay',
   robots: { index: false, follow: false },
 };
 

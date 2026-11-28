@@ -8,9 +8,9 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
 
   return {
     id: '/',
-    name: `${content.app_name_ar} | ${content.app_name_en}`,
-    short_name: content.app_name_ar.slice(0, 12),
-    description: `${content.tagline_ar} — منصة شراء وبيع USDT بالدينار الليبي مباشرة عبر LYPay وOnePay وشبكة TRON.`,
+    name: content.app_name_ar === content.app_name_en ? content.app_name_ar : `${content.app_name_ar} | ${content.app_name_en}`,
+    short_name: (content.app_name_en || content.app_name_ar || 'ZarnixPay').slice(0, 12),
+    description: `${content.tagline_ar} — منصة ZarnixPay لشراء وبيع USDT بالدينار الليبي مباشرة عبر LYPay وOnePay وشبكة TRON.`,
     start_url: '/',
     scope: '/',
     display: 'standalone',

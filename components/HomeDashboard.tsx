@@ -171,7 +171,7 @@ export function HomeDashboard({
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
                   <h1 className="text-sm sm:text-base font-bold text-white truncate">
-                    {user ? `مرحباً، ${user.full_name}` : 'مرحباً بك في تيتر ليبيا'}
+                    {user ? `مرحباً، ${user.full_name}` : 'مرحباً بك في ZarnixPay'}
                   </h1>
                   {user?.kyc_status === 'verified' && (
                     <CheckCircle2 className="w-4 h-4 text-[#10F5A6] shrink-0 fill-[#10F5A6]/20" />

@@ -8,7 +8,7 @@ import { db } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'تسجيل الدخول — تيتر ليبيا',
+  title: 'تسجيل الدخول — ZarnixPay',
   robots: { index: false, follow: false },
 };
 

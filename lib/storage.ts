@@ -21,7 +21,7 @@ export function getWritableDataDir(): string {
     cachedWritableDir = localData;
     return cachedWritableDir;
   } catch {
-    const tmpData = path.join(os.tmpdir(), 'tether-libya-data');
+    const tmpData = path.join(os.tmpdir(), 'zarnixpay-data');
     fs.mkdirSync(tmpData, { recursive: true });
     cachedWritableDir = tmpData;
     return cachedWritableDir;

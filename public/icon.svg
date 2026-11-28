@@ -1,17 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
   <rect width="512" height="512" rx="112" fill="#050B18"/>
-  <circle cx="256" cy="256" r="184" stroke="url(#halo)" stroke-width="14"/>
-  <circle cx="256" cy="256" r="144" stroke="#10F5A6" stroke-opacity="0.45" stroke-width="6"/>
-  <path d="M168 164H344V208H280V364H232V208H168V164Z" fill="url(#tgrad)"/>
-  <ellipse cx="256" cy="244" rx="108" ry="28" stroke="#10F5A6" stroke-width="14"/>
+  <path d="M256 68L416 144V268C416 356 346 420 256 448C166 420 96 356 96 268V144L256 68Z" stroke="url(#zpShield)" stroke-width="18" stroke-linejoin="round" fill="#071329"/>
+  <path d="M174 166H338L218 308H342V350H170L290 208H174V166Z" fill="url(#zpGrad)"/>
   <defs>
-    <linearGradient id="halo" x1="72" y1="72" x2="440" y2="440" gradientUnits="userSpaceOnUse">
+    <linearGradient id="zpShield" x1="96" y1="68" x2="416" y2="448" gradientUnits="userSpaceOnUse">
       <stop stop-color="#10F5A6"/>
       <stop offset="1" stop-color="#0D8BFF"/>
     </linearGradient>
-    <linearGradient id="tgrad" x1="168" y1="164" x2="344" y2="364" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#34F5C5"/>
-      <stop offset="1" stop-color="#059669"/>
+    <linearGradient id="zpGrad" x1="170" y1="166" x2="342" y2="350" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#10F5A6"/>
+      <stop offset="1" stop-color="#0D8BFF"/>
     </linearGradient>
   </defs>
 </svg>
